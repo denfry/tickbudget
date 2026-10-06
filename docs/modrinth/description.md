@@ -1,124 +1,87 @@
-# ⏱️ TickBudget
+# TickBudget
 
-**Tick budget runner, adaptive fair-share time pool, and thread diagnostics for Paper and Folia servers (Minecraft 1.21+, Java 21).**
+A shared tick-time budget for Paper and Folia plugins. Plugins run long jobs in small slices, and TickBudget divides the available milliseconds between them.
 
----
+TickBudget is a library plugin. It does nothing on its own until another plugin uses it, but it gives admins a command that shows which plugin spends how much tick time.
 
-## 🌟 Why TickBudget?
+### For server owners
 
-In Minecraft server development, heavy operations (block iteration, entity scans, chunk inspections, inventory processing) often suffer from two major problems:
+If a plugin you run lists TickBudget as a dependency, drop the jar into `plugins/` and restart. There is nothing to set up. The defaults work for most servers.
 
-1. **Tick Spikes & Freezes:** Tasks attempted in single ticks spike MSPT past 50ms and drop server TPS.
-2. **The "Tragedy of the Commons":** Multiple plugins each consuming "just 5ms" together exhaust the tick window, starving other plugins and vanilla game mechanics.
-3. **Folia Concurrency Pitfalls:** Accessing world state, entities, or blocks from the wrong thread or scheduler leads to crashes or silent data corruption.
+* **Per-plugin tick usage** - `/tickbudget status` shows CPU time, completed steps, deferred ticks and thread violations for each plugin over the last 60 seconds.
+* **Top tasks** - `/tickbudget top` lists running tasks by total CPU time.
+* **Fair sharing** - each plugin gets a guaranteed minimum per tick. The rest of the free time is split by task priority, so one plugin cannot use up the whole tick.
+* **Paper and Folia** - the plugin detects the platform at startup and uses the matching scheduler.
 
-**TickBudget** solves this by providing:
-* ⏱️ **Predictable Tick Budgeting:** Slice long-running workloads across consecutive ticks with strict millisecond budgets.
-* ⚖️ **Adaptive Fair-Share Pool:** Dynamic pooling based on real-time server tick consumption (`ServerTickStartEvent`), guaranteeing minimum execution time (`floor`) and weighted priority distribution (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`).
-* 🌐 **Zero-Headache Multi-Platform Support:** Single `Target` abstraction (`global()`, `region(loc)`, `entity(entity)`, `async()`) that routes tasks to the correct scheduler on Paper and Folia automatically.
-* 🔍 **Thread Ownership Verification (`assertOn`):** Detects illegal cross-region or off-thread access before it causes server crashes.
-* 🚀 **Safe Async Helpers:** Unified, crash-safe asynchronous chunk loading and teleportation.
-* 📊 **Admin Telemetry & bStats:** Live monitoring via `/tickbudget status` and `/tickbudget top` showing exact CPU millisecond usage per plugin over the last minute.
+Requires Java 21. Tested on Paper 1.21 to 26.3 and on every Folia build from 1.21.4 to 26.2.
 
----
+### Commands
 
-## 🛠️ For Server Administrators
+Everything uses the permission `tickbudget.admin`, which operators have by default.
 
-### Commands & Permissions
+**/tickbudget status** *Platform, active task count and per-plugin usage for the last 60 seconds*
+</br>
+**/tickbudget top** *Running tasks sorted by CPU time*
+</br>
+**/tickbudget debug <on|off>** *Log details when a task touches the wrong thread*
+</br>
+**/tickbudget reload** *Reload config.yml*
 
-Permission required: `tickbudget.admin` (granted to OP by default).
+### Configuration
 
-| Command | Description |
-|---|---|
-| `/tickbudget status` | Displays platform bridge, active task count, and last 60s per-plugin stats (CPU ms, completed steps, deferred ticks, violations). |
-| `/tickbudget top` | Lists top active tasks sorted by cumulative CPU time consumed. |
-| `/tickbudget debug <on\|off>` | Toggles detailed thread ownership violation diagnostics. |
-| `/tickbudget reload` | Reloads `config.yml` settings without restarting the server. |
-
-### Live Status Example
-```
----------------- [ TickBudget Status ] ----------------
-Platform: Paper | Active Tasks: 1
-Plugin Metrics (last 60s):
- • MyMiningPlugin: 14.82 ms | Tasks: 1 | Steps: 420 | Deferred: 0 | Violations: 0
- • CustomSpawns: 3.10 ms | Tasks: 0 | Steps: 15 | Deferred: 0 | Violations: 0
--------------------------------------------------------
-```
-
-### Configuration (`config.yml`)
 ```yaml
-# Unused tick buffer reserved for vanilla ticks (milliseconds)
+# Time left unused in each tick for the server itself (ms)
 safety-margin-ms: 5.0
 
-# Guaranteed minimum execution time per active plugin per tick (milliseconds)
+# Minimum time each active plugin gets per tick (ms)
 floor-budget-ms: 0.5
 
-# Default budget per task when not explicitly specified (milliseconds)
+# Budget for tasks that do not set their own (ms)
 default-task-budget-ms: 1.0
 
-# Fair-share distribution weights by task priority
+# Share of the free time by task priority
 priority-weights:
   low: 1
   normal: 2
   high: 4
   critical: 8
 
-# Debug mode: logs stack traces and scheduler hints when thread assertions fail
 debug: false
 
-# Anonymous metrics reporting via bStats (https://bstats.org)
+# Anonymous usage statistics through bStats
 metrics: true
-bstats-id: 34533
 ```
 
----
+### For plugin developers
 
-## 📦 For Developers: API Quickstart
+A task is split into steps. TickBudget runs as many steps as fit into the budget each tick and continues on the next tick.
 
-### 1. Depend on TickBudget in `plugin.yml`
-```yaml
-name: YourPlugin
-version: 1.0.0
-main: com.example.YourPlugin
-depend: [TickBudget]
-```
-
-### 2. Gradle (Kotlin DSL)
-```kotlin
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    compileOnly("dev.denfry.tickbudget:tickbudget-api:0.1.0")
-}
-```
-
-### 3. Stepped Task Iteration Example
 ```java
-import dev.denfry.tickbudget.api.*;
-
 TickBudget tb = TickBudget.of(plugin);
 
-List<Block> blocksToProcess = ...;
-
-TaskHandle handle = tb.run(Target.region(location), BudgetedTask.iterate(blocksToProcess, block -> {
-    // Verified to run on the region's owning thread
-    block.setType(Material.AIR);
-}))
-.name("clear-ruins-blocks")
-.budget(Budget.millisPerTick(1.5)) // Max 1.5ms per tick
-.priority(Priority.NORMAL)
-.onComplete(() -> getLogger().info("Cleared all blocks safely!"))
-.onError(error -> getLogger().severe("Task encountered an error: " + error.getMessage()))
-.start();
+tb.run(Target.region(location), BudgetedTask.iterate(blocks, block -> block.setType(Material.AIR)))
+        .name("clear-ruins")
+        .budget(Budget.millisPerTick(1.5))
+        .priority(Priority.NORMAL)
+        .onComplete(() -> plugin.getLogger().info("Done"))
+        .onError(error -> plugin.getLogger().severe(error.getMessage()))
+        .start();
 ```
 
----
+* **Targets** - `Target.global()`, `Target.region(location)`, `Target.entity(entity)` and `Target.async()`. On Folia each one maps to the matching scheduler. On Paper, global, region and entity run on the main thread and async runs off it.
+* **Thread checks** - `tb.assertOn(target)` throws if the current thread does not own the target.
+* **Async chunks** - `tb.chunks().loadAsync(world, x, z)` loads a chunk without blocking.
 
-## 🔗 Links & Resources
+Add `depend: [TickBudget]` to your `plugin.yml`. The API jar is attached to every [GitHub release](https://github.com/denfry/tickbudget/releases). To build it yourself, run `./gradlew :tickbudget-api:publishToMavenLocal`.
 
-* 💻 **GitHub Repository:** [denfry/tickbudget](https://github.com/denfry/tickbudget)
-* 🐞 **Issue Tracker:** [GitHub Issues](https://github.com/denfry/tickbudget/issues)
-* 📈 **bStats Metrics:** [bStats (34533)](https://bstats.org/plugin/bukkit/TickBudget/34533)
-* 📄 **License:** MIT License
+### Metrics
+
+TickBudget reports anonymous statistics (server platform, number of plugins using it, number of active tasks) to [bStats](https://bstats.org/plugin/bukkit/TickBudget/34533). Set `metrics: false` in `config.yml` to turn it off.
+
+### Links
+
+* [Source code](https://github.com/denfry/tickbudget)
+* [Report a bug](https://github.com/denfry/tickbudget/issues)
+* [bStats](https://bstats.org/plugin/bukkit/TickBudget/34533)
+
+Released under the MIT License.
