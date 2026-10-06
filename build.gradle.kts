@@ -4,7 +4,7 @@ plugins {
 
 allprojects {
     group = "dev.denfry.tickbudget"
-    version = "0.1.0-SNAPSHOT"
+    version = "0.1.0"
 
     repositories {
         mavenCentral()
