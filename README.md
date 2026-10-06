@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
   <a href="https://openjdk.org/projects/jdk/21/"><img src="https://img.shields.io/badge/java-21%2B-orange.svg" alt="Java 21+" /></a>
   <a href="https://papermc.io"><img src="https://img.shields.io/badge/platform-Paper%20%7C%20Folia-brightgreen.svg" alt="Platforms" /></a>
-  <a href="https://bstats.org/plugin/bukkit/TickBudget/24680"><img src="https://img.shields.io/badge/bStats-24680-informational.svg" alt="bStats Metrics" /></a>
+  <a href="https://bstats.org/plugin/bukkit/TickBudget/34533"><img src="https://img.shields.io/badge/bStats-34533-informational.svg" alt="bStats Metrics" /></a>
 </p>
 
 ---
@@ -172,7 +172,7 @@ debug: false
 
 # Anonymous metrics reporting via bStats (https://bstats.org)
 metrics: true
-bstats-id: 24680
+bstats-id: 34533
 ```
 
 ---
@@ -202,7 +202,7 @@ Plugin Metrics (last 60s):
 
 ## 📈 bStats Metrics
 
-TickBudget includes anonymous server metrics using [bStats](https://bstats.org/plugin/bukkit/TickBudget/24680).
+TickBudget includes anonymous server metrics using [bStats](https://bstats.org/plugin/bukkit/TickBudget/34533).
 Metrics include:
 * Server platform distribution (Paper vs. Folia)
 * Number of active client plugins utilizing TickBudget

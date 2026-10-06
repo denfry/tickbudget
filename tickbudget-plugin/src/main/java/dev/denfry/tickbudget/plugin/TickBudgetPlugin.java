@@ -67,7 +67,7 @@ public final class TickBudgetPlugin extends JavaPlugin implements Listener {
 
         // Initialize bStats metrics (relocated to dev.denfry.tickbudget.plugin.metrics.bstats in jar)
         if (getConfig().getBoolean("metrics", true)) {
-            int pluginId = getConfig().getInt("bstats-id", 24680);
+            int pluginId = getConfig().getInt("bstats-id", 34533);
             try {
                 Metrics bMetrics = new Metrics(this, pluginId);
                 bMetrics.addCustomChart(new SimplePie("platform", () -> bridge.name()));

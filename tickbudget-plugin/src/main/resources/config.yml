@@ -23,4 +23,4 @@ debug: false
 # TickBudget collects anonymous usage statistics (server platform, count of active client plugins, active tasks).
 # Set to false to completely disable metrics reporting.
 metrics: true
-bstats-id: 24680
+bstats-id: 34533
