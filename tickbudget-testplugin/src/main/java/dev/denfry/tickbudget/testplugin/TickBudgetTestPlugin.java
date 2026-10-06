@@ -20,6 +20,8 @@ public final class TickBudgetTestPlugin extends JavaPlugin {
     private final AtomicBoolean globalTaskDone = new AtomicBoolean(false);
     private final AtomicBoolean asyncTaskDone = new AtomicBoolean(false);
     private final AtomicBoolean chunkLoadDone = new AtomicBoolean(false);
+    private final AtomicBoolean assertionDone = new AtomicBoolean(false);
+    private final AtomicInteger failures = new AtomicInteger();
 
     @Override
     public void onEnable() {
@@ -30,13 +32,18 @@ public final class TickBudgetTestPlugin extends JavaPlugin {
         TickBudget tb = TickBudget.of(this);
         getLogger().info("[TEST 1] TickBudget.of(this) acquired: " + tb);
 
-        // Test 2: Global thread assertion
-        try {
-            tb.assertOn(Target.global());
-            getLogger().info("[TEST 2] assertOn(Target.global()) PASSED on main thread");
-        } catch (Throwable t) {
-            getLogger().severe("[TEST 2] assertOn(Target.global()) FAILED: " + t.getMessage());
-        }
+        // Test 2: Global thread assertion. Runs through the global target because on Folia
+        // onEnable is not executed on the global region thread.
+        tb.schedule(Target.global(), () -> {
+            try {
+                tb.assertOn(Target.global());
+                getLogger().info("[TEST 2] assertOn(Target.global()) PASSED on global thread");
+            } catch (Throwable t) {
+                fail("[TEST 2] assertOn(Target.global()) FAILED: " + t.getMessage());
+            }
+            assertionDone.set(true);
+            checkAllDone();
+        });
 
         // Test 3: BudgetedTask on Target.global()
         List<String> items = new ArrayList<>();
@@ -61,7 +68,11 @@ public final class TickBudgetTestPlugin extends JavaPlugin {
             globalTaskDone.set(true);
             checkAllDone();
         })
-        .onError(err -> getLogger().severe("[TEST 3] Global task failed: " + err.getMessage()))
+        .onError(err -> {
+            fail("[TEST 3] Global task failed: " + err.getMessage());
+            globalTaskDone.set(true);
+            checkAllDone();
+        })
         .start();
 
         getLogger().info("[TEST 3] Queued global task: " + globalHandle.name());
@@ -81,7 +92,11 @@ public final class TickBudgetTestPlugin extends JavaPlugin {
             asyncTaskDone.set(true);
             checkAllDone();
         })
-        .onError(err -> getLogger().severe("[TEST 4] Async task failed: " + err.getMessage()))
+        .onError(err -> {
+            fail("[TEST 4] Async task failed: " + err.getMessage());
+            asyncTaskDone.set(true);
+            checkAllDone();
+        })
         .start();
 
         getLogger().info("[TEST 4] Queued async task: " + asyncHandle.name());
@@ -94,7 +109,9 @@ public final class TickBudgetTestPlugin extends JavaPlugin {
                 chunkLoadDone.set(true);
                 checkAllDone();
             }).exceptionally(err -> {
-                getLogger().severe("[TEST 5] AsyncChunks failed: " + err.getMessage());
+                fail("[TEST 5] AsyncChunks failed: " + err.getMessage());
+                chunkLoadDone.set(true);
+                checkAllDone();
                 return null;
             });
         } else {
@@ -115,10 +132,19 @@ public final class TickBudgetTestPlugin extends JavaPlugin {
         }
     }
 
+    private void fail(String message) {
+        failures.incrementAndGet();
+        getLogger().severe(message);
+    }
+
     private void checkAllDone() {
-        if (globalTaskDone.get() && asyncTaskDone.get() && chunkLoadDone.get()) {
+        if (assertionDone.get() && globalTaskDone.get() && asyncTaskDone.get() && chunkLoadDone.get()) {
             getLogger().info("==================================================");
-            getLogger().info("[TEST SUITE RESULT] ALL TICKBUDGET TESTS PASSED!");
+            if (failures.get() == 0) {
+                getLogger().info("[TEST SUITE RESULT] ALL TICKBUDGET TESTS PASSED!");
+            } else {
+                getLogger().severe("[TEST SUITE RESULT] TICKBUDGET TESTS FAILED: " + failures.get() + " failure(s)");
+            }
             getLogger().info("==================================================");
 
             TickBudget tb = TickBudget.of(this);
