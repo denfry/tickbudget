@@ -1,0 +1,18 @@
+name: TickBudget
+version: '0.1.0'
+main: dev.denfry.tickbudget.plugin.TickBudgetPlugin
+api-version: '1.21'
+folia-supported: true
+author: denfry
+description: Fair-share tick budgeting scheduler and performance telemetry for Paper and Folia.
+
+permissions:
+  tickbudget.admin:
+    description: Access to TickBudget admin commands and telemetry
+    default: op
+
+commands:
+  tickbudget:
+    description: Main TickBudget administration command
+    permission: tickbudget.admin
+    usage: /<command> [status|top|debug|reload]

@@ -1,0 +1,24 @@
+# TickBudget Configuration
+
+# Unused tick buffer reserved for server ticks (milliseconds)
+safety-margin-ms: 5.0
+
+# Guaranteed minimum execution time per active plugin per tick (milliseconds)
+floor-budget-ms: 0.5
+
+# Default budget per task when not explicitly specified (milliseconds)
+default-task-budget-ms: 1.0
+
+# Fair-share distribution weights by task priority
+priority-weights:
+  low: 1
+  normal: 2
+  high: 4
+  critical: 8
+
+# Debug mode: logs stack traces and scheduler hints when thread assertions fail
+debug: false
+
+# Anonymous metrics reporting via bStats (https://bstats.org)
+metrics: true
+bstats-id: 24680

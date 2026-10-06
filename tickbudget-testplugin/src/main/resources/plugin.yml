@@ -1,0 +1,8 @@
+name: TickBudgetTest
+version: '0.1.0'
+main: dev.denfry.tickbudget.testplugin.TickBudgetTestPlugin
+api-version: '1.21'
+folia-supported: true
+depend: [TickBudget]
+author: denfry
+description: Integration test suite plugin for TickBudget on Paper and Folia.
