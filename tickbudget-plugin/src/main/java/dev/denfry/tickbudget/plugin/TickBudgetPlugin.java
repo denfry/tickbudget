@@ -72,6 +72,8 @@ public final class TickBudgetPlugin extends JavaPlugin implements Listener {
                 Metrics bMetrics = new Metrics(this, pluginId);
                 bMetrics.addCustomChart(new SimplePie("platform", () -> bridge.name()));
                 bMetrics.addCustomChart(new SingleLineChart("active_client_plugins", () -> metricsTracker.allMetrics().size()));
+                bMetrics.addCustomChart(new SingleLineChart("active_tasks", () -> runner.activeTasks().size()));
+                bMetrics.addCustomChart(new SimplePie("debug_mode", () -> config.debugEnabled() ? "Enabled" : "Disabled"));
             } catch (Throwable t) {
                 getLogger().fine("Could not initialize bStats metrics: " + t.getMessage());
             }

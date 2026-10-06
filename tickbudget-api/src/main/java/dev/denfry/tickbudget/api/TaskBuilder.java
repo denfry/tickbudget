@@ -2,27 +2,65 @@ package dev.denfry.tickbudget.api;
 
 import java.util.function.Consumer;
 
+/**
+ * Fluent builder for configuring and starting a budgeted task.
+ */
 public interface TaskBuilder {
 
-    /** Per-tick budget of this task. Default: 1 ms. */
+    /**
+     * Sets the per-tick budget limit for this task.
+     *
+     * @param budget the budget configuration
+     * @return this builder
+     */
     TaskBuilder budget(Budget budget);
 
+    /**
+     * Sets the per-tick budget limit in milliseconds.
+     *
+     * @param millisPerTick the time budget in milliseconds per tick
+     * @return this builder
+     */
     default TaskBuilder budgetMillis(double millisPerTick) {
         return budget(Budget.millisPerTick(millisPerTick));
     }
 
-    /** Default: {@link Priority#NORMAL}. */
+    /**
+     * Sets the priority weight for fair-share scheduling. Default: {@link Priority#NORMAL}.
+     *
+     * @param priority the task priority
+     * @return this builder
+     */
     TaskBuilder priority(Priority priority);
 
-    /** Label shown in {@code /tickbudget top} and in error logs. */
+    /**
+     * Sets a human-readable name for this task shown in diagnostics and logs.
+     *
+     * @param name descriptive task name
+     * @return this builder
+     */
     TaskBuilder name(String name);
 
-    /** Called on the task's own thread after the last step. */
+    /**
+     * Sets a completion callback invoked after the task returns {@link StepResult#DONE}.
+     *
+     * @param callback the action to run on completion
+     * @return this builder
+     */
     TaskBuilder onComplete(Runnable callback);
 
-    /** Called on the task's own thread when a step throws. The task is removed afterwards. */
+    /**
+     * Sets an error handler invoked if a step throws an uncaught exception.
+     *
+     * @param callback error handler receiving the exception
+     * @return this builder
+     */
     TaskBuilder onError(Consumer<Throwable> callback);
 
-    /** Queues the task. */
+    /**
+     * Queues and starts the task on the target scheduler.
+     *
+     * @return a handle for tracking, monitoring, or cancelling the task
+     */
     TaskHandle start();
 }

@@ -20,5 +20,7 @@ priority-weights:
 debug: false
 
 # Anonymous metrics reporting via bStats (https://bstats.org)
+# TickBudget collects anonymous usage statistics (server platform, count of active client plugins, active tasks).
+# Set to false to completely disable metrics reporting.
 metrics: true
 bstats-id: 24680

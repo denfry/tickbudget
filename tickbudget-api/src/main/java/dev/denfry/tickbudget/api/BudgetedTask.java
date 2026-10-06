@@ -3,14 +3,28 @@ package dev.denfry.tickbudget.api;
 import java.util.Iterator;
 import java.util.function.Consumer;
 
-/** Work that is executed in small steps spread over several ticks. */
+/**
+ * Functional interface representing work executed in small steps spread across ticks.
+ */
 @FunctionalInterface
 public interface BudgetedTask {
 
-    /** Does one small unit of work. Keep it much shorter than the budget. */
+    /**
+     * Executes one small unit of work. Must complete well within the per-tick budget.
+     *
+     * @return {@link StepResult#MORE} if more work remains, or {@link StepResult#DONE} if finished
+     * @throws Exception if an error occurs during execution
+     */
     StepResult step() throws Exception;
 
-    /** One element of {@code items} per step. */
+    /**
+     * Convenience factory for processing an iterable collection one item per step.
+     *
+     * @param <T> element type
+     * @param items collection to iterate over
+     * @param action operation to perform on each item
+     * @return a budgeted task iterating over the elements
+     */
     static <T> BudgetedTask iterate(Iterable<T> items, Consumer<? super T> action) {
         Iterator<T> it = items.iterator();
         return () -> {

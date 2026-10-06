@@ -1,9 +1,11 @@
 package dev.denfry.tickbudget.api;
 
-/** Outcome of one {@link BudgetedTask#step()} call. */
+/**
+ * Outcome of one {@link BudgetedTask#step()} execution slice.
+ */
 public enum StepResult {
-    /** More work remains; the runner may call {@code step()} again. */
+    /** More work remains; the runner may invoke {@code step()} again if budget permits. */
     MORE,
-    /** The task finished. */
+    /** The task is completely finished. */
     DONE
 }
