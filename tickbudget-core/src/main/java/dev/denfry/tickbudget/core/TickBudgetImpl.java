@@ -10,6 +10,7 @@ import dev.denfry.tickbudget.core.bridge.PlatformBridge;
 import dev.denfry.tickbudget.core.config.TickBudgetConfig;
 import dev.denfry.tickbudget.core.runner.BudgetRunner;
 import dev.denfry.tickbudget.core.task.TaskBuilderImpl;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -71,10 +72,10 @@ public final class TickBudgetImpl implements TickBudget {
 
     private void warnBudgetClamped(long requestedNanos, long maxNanos) {
         if (budgetClampWarned.compareAndSet(false, true)) {
-            LOGGER.log(Level.WARNING,
-                    "[TickBudget] Plugin ''{0}'' requested a task budget of {1} ms; clamped to max-task-budget-ms ({2} ms). "
+            LOGGER.warning(String.format(Locale.ROOT,
+                    "Plugin '%s' requested a task budget of %.3f ms; clamped to max-task-budget-ms (%.3f ms). "
                             + "Further clamps for this plugin are not logged.",
-                    new Object[]{plugin.getName(), requestedNanos / 1_000_000.0, maxNanos / 1_000_000.0});
+                    plugin.getName(), requestedNanos / 1_000_000.0, maxNanos / 1_000_000.0));
         }
     }
 
@@ -122,7 +123,7 @@ public final class TickBudgetImpl implements TickBudget {
             );
 
             if (config.get().debugEnabled()) {
-                LOGGER.log(Level.WARNING, "[TickBudget-Debug] " + msg + " Called by plugin: " + plugin.getName(),
+                LOGGER.log(Level.WARNING, "[Debug] " + msg + " Called by plugin: " + plugin.getName(),
                         new IllegalStateException(msg));
             }
             throw new IllegalStateException(msg);

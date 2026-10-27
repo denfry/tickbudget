@@ -149,7 +149,7 @@ public class TaskLifecycleTest {
 
         assertEquals(6, metricsTracker.get("TestPlugin").violations());
         assertEquals(2, records.size());
-        assertEquals(" (4 similar warnings suppressed)", records.get(1).getParameters()[4]);
+        assertTrue(records.get(1).getMessage().endsWith(" (4 similar warnings suppressed)"), records.get(1).getMessage());
     }
 
     private static TickBudgetConfig withSafetyMarginAndDefaultBudget(long safetyMarginNanos, long defaultBudgetNanos) {
