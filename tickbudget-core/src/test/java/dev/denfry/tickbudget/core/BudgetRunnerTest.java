@@ -220,10 +220,10 @@ public class BudgetRunnerTest {
         .priority(Priority.NORMAL)
         .start();
 
-        // Simulate server already spending 48ms in the tick before our tasks run
+        // Previous tick spent 48ms on server work:
         // 50ms - 48ms = 2ms remaining; safety margin is 5ms -> pool is 0ms (overloaded tick)
         // Normal priority tasks will only receive floor budget (0.5ms)
-        bridge.setTickElapsedNanos(48_000_000L);
+        bridge.setLastTickDurationNanos(48_000_000L);
 
         runner.processPaperMainTick();
         // Since floor budget is 0.5ms (500,000ns) and each step is 0.6ms,

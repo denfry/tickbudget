@@ -1,6 +1,6 @@
 package dev.denfry.tickbudget.paper;
 
-import com.destroystokyo.paper.event.server.ServerTickStartEvent;
+import com.destroystokyo.paper.event.server.ServerTickEndEvent;
 import dev.denfry.tickbudget.api.Target;
 import dev.denfry.tickbudget.core.bridge.PlatformBridge;
 import java.util.concurrent.CompletableFuture;
@@ -19,7 +19,7 @@ import org.bukkit.scheduler.BukkitTask;
  */
 public final class PaperPlatformBridge implements PlatformBridge, Listener {
 
-    private volatile long currentTickStartNanos = -1L;
+    private volatile long lastTickDurationNanos = -1L;
 
     @Override
     public String name() {
@@ -37,17 +37,13 @@ public final class PaperPlatformBridge implements PlatformBridge, Listener {
     }
 
     @EventHandler
-    public void onTickStart(ServerTickStartEvent event) {
-        this.currentTickStartNanos = System.nanoTime();
+    public void onTickEnd(ServerTickEndEvent event) {
+        this.lastTickDurationNanos = (long) (event.getTickDuration() * 1_000_000d);
     }
 
     @Override
-    public long currentTickElapsedNanos() {
-        long start = currentTickStartNanos;
-        if (start <= 0L) {
-            return -1L;
-        }
-        return Math.max(0L, System.nanoTime() - start);
+    public long lastTickDurationNanos() {
+        return lastTickDurationNanos;
     }
 
     @Override

@@ -111,12 +111,12 @@ public class TaskLifecycleTest {
             return StepResult.MORE;
         }).budget(Budget.millisPerTick(5.0)).start();
 
-        // 40 ms already spent: 10 ms left, minus 5 ms margin -> 5 ms pool -> 5 one-millisecond steps
-        bridge.setTickElapsedNanos(40_000_000L);
+        // Previous tick took 40 ms of server work: 10 ms left, minus 5 ms margin -> 5 ms pool -> 5 one-millisecond steps
+        bridge.setLastTickDurationNanos(40_000_000L);
         runner.processPaperMainTick();
         assertEquals(5, steps.get());
 
-        // 15 ms margin leaves no pool: only the 0.5 ms floor, i.e. a single step
+        // Server work is now 40 - 5 = 35 ms, and a 15 ms margin leaves no pool: only the 0.5 ms floor, i.e. a single step
         config.set(withSafetyMarginAndDefaultBudget(15_000_000L, 1_000_000L));
         runner.processPaperMainTick();
         assertEquals(6, steps.get());
