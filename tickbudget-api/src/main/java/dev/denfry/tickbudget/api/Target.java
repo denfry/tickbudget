@@ -76,6 +76,7 @@ public sealed interface Target {
 
     /**
      * Target bound to the entity and its owning region scheduler.
+     * On Folia, tasks and scheduled actions on a removed entity are cancelled.
      *
      * @param entity the entity
      * @return entity target

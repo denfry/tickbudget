@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.bukkit.plugin.Plugin;
 
 /**
@@ -16,11 +17,11 @@ import org.bukkit.plugin.Plugin;
  */
 public final class FairShareDispatcher {
 
-    private final TickBudgetConfig config;
+    private final Supplier<TickBudgetConfig> configSupplier;
     private final SystemClock clock;
 
-    public FairShareDispatcher(TickBudgetConfig config, SystemClock clock) {
-        this.config = config;
+    public FairShareDispatcher(Supplier<TickBudgetConfig> configSupplier, SystemClock clock) {
+        this.configSupplier = configSupplier;
         this.clock = clock;
     }
 
@@ -33,6 +34,7 @@ public final class FairShareDispatcher {
         if (readyTasks.isEmpty()) {
             return List.of();
         }
+        TickBudgetConfig config = configSupplier.get();
 
         // Group tasks by plugin, keeping the highest priority / oldest task first
         Map<Plugin, List<BudgetedTaskHandle>> tasksByPlugin = new HashMap<>();

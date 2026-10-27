@@ -8,7 +8,7 @@ public enum TaskState {
     QUEUED,
     /** Successfully ran to completion. */
     DONE,
-    /** Cancelled by the user or owner plugin. */
+    /** Cancelled by the user, by disabling the owner plugin, or because its target (e.g. an entity) was removed. */
     CANCELLED,
     /** Terminated due to an uncaught exception. */
     FAILED;

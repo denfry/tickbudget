@@ -10,6 +10,7 @@ import dev.denfry.tickbudget.core.task.BudgetedTaskHandle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Supplier;
 import org.bukkit.plugin.Plugin;
 
 /**
@@ -18,7 +19,7 @@ import org.bukkit.plugin.Plugin;
 public final class BudgetRunner {
 
     private final PlatformBridge bridge;
-    private final TickBudgetConfig config;
+    private final Supplier<TickBudgetConfig> config;
     private final MetricsTracker metricsTracker;
     private final FairShareDispatcher dispatcher;
     private final SystemClock clock;
@@ -30,7 +31,7 @@ public final class BudgetRunner {
 
     public BudgetRunner(
             PlatformBridge bridge,
-            TickBudgetConfig config,
+            Supplier<TickBudgetConfig> config,
             MetricsTracker metricsTracker,
             SystemClock clock
     ) {
@@ -48,6 +49,7 @@ public final class BudgetRunner {
                     tickBudgetPlugin,
                     Target.global(),
                     this::processPaperMainTick,
+                    () -> {},
                     1L
             );
         }
@@ -67,24 +69,31 @@ public final class BudgetRunner {
 
     public TaskHandle submit(BudgetedTaskHandle handle) {
         allActiveTasks.add(handle);
+        // Runs on every terminal transition (done, failed, cancelled, target retired)
+        handle.setTerminationListener(() -> {
+            allActiveTasks.remove(handle);
+            paperSyncQueue.remove(handle);
+        });
 
         if (bridge.isFolia() || handle.target() instanceof Target.OfAsync) {
             // On Folia, or for async tasks on Paper, schedule a repeating task directly on the target's scheduler
-            PlatformBridge.TaskCancellable cancellable = bridge.scheduleRepeating(
-                    handle.ownerPlugin(),
-                    handle.target(),
-                    () -> {
-                        if (handle.state().isTerminal()) {
-                            return;
-                        }
-                        long budget = handle.budget().nanosPerTick();
-                        boolean hasMore = handle.executeSlice(budget, clock);
-                        if (!hasMore) {
-                            allActiveTasks.remove(handle);
-                        }
-                    },
-                    1L
-            );
+            PlatformBridge.TaskCancellable cancellable;
+            try {
+                cancellable = bridge.scheduleRepeating(
+                        handle.ownerPlugin(),
+                        handle.target(),
+                        () -> {
+                            if (!handle.state().isTerminal()) {
+                                handle.executeSlice(handle.budget().nanosPerTick(), clock);
+                            }
+                        },
+                        handle::cancel,
+                        1L
+                );
+            } catch (RuntimeException e) {
+                handle.cancel();
+                throw e;
+            }
             handle.setPlatformTaskHandle(cancellable);
         } else {
             // On Paper main thread: queue for the centralized fair-share tick loop
@@ -105,13 +114,14 @@ public final class BudgetRunner {
         // 50ms default tick window minus already-elapsed time in this tick, minus safety margin
         long totalTickNanos = 50_000_000L;
         long elapsedNanos = bridge.currentTickElapsedNanos();
+        TickBudgetConfig cfg = config.get();
         long poolNanos;
         if (elapsedNanos >= 0) {
             long remainingTickNanos = Math.max(0, totalTickNanos - elapsedNanos);
-            poolNanos = Math.max(0, remainingTickNanos - config.safetyMarginNanos());
+            poolNanos = Math.max(0, remainingTickNanos - cfg.safetyMarginNanos());
         } else {
             // Fallback when tick-start tracking is unavailable
-            poolNanos = Math.max(0, totalTickNanos - config.safetyMarginNanos());
+            poolNanos = Math.max(0, totalTickNanos - cfg.safetyMarginNanos());
         }
 
         List<BudgetedTaskHandle> currentQueue = new ArrayList<>(paperSyncQueue);
@@ -122,11 +132,7 @@ public final class BudgetRunner {
             BudgetedTaskHandle task = allocation.handle();
             scheduledTasks.add(task);
 
-            boolean hasMore = task.executeSlice(allocation.allocatedNanos(), clock);
-            if (!hasMore) {
-                paperSyncQueue.remove(task);
-                allActiveTasks.remove(task);
-            }
+            task.executeSlice(allocation.allocatedNanos(), clock);
         }
 
         // Record deferred ticks for tasks that had to wait
@@ -141,8 +147,6 @@ public final class BudgetRunner {
         for (BudgetedTaskHandle task : allActiveTasks) {
             if (task.ownerPlugin().equals(plugin)) {
                 task.cancel();
-                allActiveTasks.remove(task);
-                paperSyncQueue.remove(task);
             }
         }
     }

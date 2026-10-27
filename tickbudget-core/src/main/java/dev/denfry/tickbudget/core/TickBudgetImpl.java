@@ -11,6 +11,7 @@ import dev.denfry.tickbudget.core.config.TickBudgetConfig;
 import dev.denfry.tickbudget.core.runner.BudgetRunner;
 import dev.denfry.tickbudget.core.task.TaskBuilderImpl;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bukkit.Chunk;
@@ -27,7 +28,7 @@ public final class TickBudgetImpl implements TickBudget {
     private final PlatformBridge bridge;
     private final BudgetRunner runner;
     private final MetricsTracker metricsTracker;
-    private final TickBudgetConfig config;
+    private final Supplier<TickBudgetConfig> config;
     private final AsyncChunks asyncChunks;
 
     public TickBudgetImpl(
@@ -35,7 +36,7 @@ public final class TickBudgetImpl implements TickBudget {
             PlatformBridge bridge,
             BudgetRunner runner,
             MetricsTracker metricsTracker,
-            TickBudgetConfig config
+            Supplier<TickBudgetConfig> config
     ) {
         this.plugin = plugin;
         this.bridge = bridge;
@@ -57,6 +58,7 @@ public final class TickBudgetImpl implements TickBudget {
                 plugin,
                 target,
                 task,
+                config.get().defaultTaskBudgetNanos(),
                 metricsTracker.getOrCreate(plugin.getName()),
                 runner::submit
         );
@@ -105,7 +107,7 @@ public final class TickBudgetImpl implements TickBudget {
                     Thread.currentThread().getName(), target
             );
 
-            if (config.debugEnabled()) {
+            if (config.get().debugEnabled()) {
                 LOGGER.log(Level.WARNING, "[TickBudget-Debug] " + msg + " Called by plugin: " + plugin.getName(),
                         new IllegalStateException(msg));
             }
