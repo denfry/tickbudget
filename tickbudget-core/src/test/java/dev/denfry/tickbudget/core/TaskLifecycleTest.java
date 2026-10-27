@@ -10,13 +10,9 @@ import dev.denfry.tickbudget.core.accounting.MetricsTracker;
 import dev.denfry.tickbudget.core.config.TickBudgetConfig;
 import dev.denfry.tickbudget.core.runner.BudgetRunner;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.logging.Handler;
-import java.util.logging.Level;
 import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -126,7 +122,7 @@ public class TaskLifecycleTest {
     @DisplayName("Enabling debug at runtime makes assertOn log the violation")
     void testDebugToggleApplies() {
         bridge.setOwned(false);
-        List<LogRecord> records = captureLogs(() -> {
+        List<LogRecord> records = LogCapture.warnings(() -> {
             assertThrows(IllegalStateException.class, () -> tb.assertOn(Target.global()));
             config.set(config.get().withDebug(true));
             assertThrows(IllegalStateException.class, () -> tb.assertOn(Target.global()));
@@ -143,7 +139,7 @@ public class TaskLifecycleTest {
             return StepResult.MORE;
         }).budget(Budget.millisPerTick(1.0)).name("slow").start();
 
-        List<LogRecord> records = captureLogs(() -> {
+        List<LogRecord> records = LogCapture.warnings(() -> {
             for (int i = 0; i < 5; i++) {
                 runner.processPaperMainTick();
             }
@@ -162,39 +158,12 @@ public class TaskLifecycleTest {
                 safetyMarginNanos,
                 d.floorBudgetNanos(),
                 defaultBudgetNanos,
+                d.maxTaskBudgetNanos(),
                 d.lowPriorityWeight(),
                 d.normalPriorityWeight(),
                 d.highPriorityWeight(),
                 d.criticalPriorityWeight(),
                 d.debugEnabled()
         );
-    }
-
-    private static List<LogRecord> captureLogs(Runnable action) {
-        List<LogRecord> records = new CopyOnWriteArrayList<>();
-        Handler handler = new Handler() {
-            @Override
-            public void publish(LogRecord record) {
-                if (record.getLevel() == Level.WARNING) {
-                    records.add(record);
-                }
-            }
-
-            @Override
-            public void flush() {
-            }
-
-            @Override
-            public void close() {
-            }
-        };
-        Logger logger = Logger.getLogger("TickBudget");
-        logger.addHandler(handler);
-        try {
-            action.run();
-        } finally {
-            logger.removeHandler(handler);
-        }
-        return records;
     }
 }

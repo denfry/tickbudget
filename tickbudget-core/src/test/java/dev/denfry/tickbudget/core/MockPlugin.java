@@ -19,6 +19,7 @@ public class MockPlugin extends PluginBase {
 
     private final String name;
     private final PluginDescriptionFile description;
+    private boolean enabled = true;
 
     public MockPlugin(String name) {
         this.name = name;
@@ -51,7 +52,11 @@ public class MockPlugin extends PluginBase {
     @Override public io.papermc.paper.plugin.configuration.PluginMeta getPluginMeta() { return description; }
     @Override public io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager<Plugin> getLifecycleManager() { return null; }
     @Override public Server getServer() { return null; }
-    @Override public boolean isEnabled() { return true; }
+    @Override public boolean isEnabled() { return enabled; }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
     @Override public void onDisable() {}
     @Override public void onLoad() {}
     @Override public void onEnable() {}

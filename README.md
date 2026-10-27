@@ -160,6 +160,9 @@ floor-budget-ms: 0.5
 # Default budget per task when not explicitly specified (milliseconds)
 default-task-budget-ms: 1.0
 
+# Hard cap on any single task's budget per tick, CRITICAL included (milliseconds)
+max-task-budget-ms: 20.0
+
 # Fair-share distribution weights by task priority
 priority-weights:
   low: 1

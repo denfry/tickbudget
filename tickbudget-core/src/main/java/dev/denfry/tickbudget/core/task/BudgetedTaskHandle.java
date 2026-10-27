@@ -168,7 +168,7 @@ public final class BudgetedTaskHandle implements TaskHandle {
 
         long deadline = clock.nanoTime() + allocatedNanos;
 
-        while (clock.nanoTime() < deadline) {
+        while (clock.nanoTime() - deadline < 0) {
             if (state.get() != TaskState.QUEUED) {
                 return false;
             }

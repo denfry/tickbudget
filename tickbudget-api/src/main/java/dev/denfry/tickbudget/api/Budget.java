@@ -2,6 +2,7 @@ package dev.denfry.tickbudget.api;
 
 /**
  * Maximum time one task may spend per tick. Enforced between steps, so a single long step can overshoot it.
+ * The server-side {@code max-task-budget-ms} setting caps every budget, including CRITICAL tasks.
  *
  * @param nanosPerTick maximum nanoseconds allowed per tick
  */

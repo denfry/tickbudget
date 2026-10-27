@@ -125,6 +125,7 @@ public final class TickBudgetPlugin extends JavaPlugin implements Listener {
         long safetyMarginNanos = (long) (cfg.getDouble("safety-margin-ms", 5.0) * 1_000_000L);
         long floorBudgetNanos = (long) (cfg.getDouble("floor-budget-ms", 0.5) * 1_000_000L);
         long defaultBudgetNanos = (long) (cfg.getDouble("default-task-budget-ms", 1.0) * 1_000_000L);
+        long maxBudgetNanos = (long) (cfg.getDouble("max-task-budget-ms", 20.0) * 1_000_000L);
         int lowWeight = cfg.getInt("priority-weights.low", 1);
         int normalWeight = cfg.getInt("priority-weights.normal", 2);
         int highWeight = cfg.getInt("priority-weights.high", 4);
@@ -135,6 +136,7 @@ public final class TickBudgetPlugin extends JavaPlugin implements Listener {
                 safetyMarginNanos,
                 floorBudgetNanos,
                 defaultBudgetNanos,
+                maxBudgetNanos,
                 lowWeight,
                 normalWeight,
                 highWeight,

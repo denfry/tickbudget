@@ -61,6 +61,7 @@ public interface TaskBuilder {
      * Queues and starts the task on the target scheduler.
      *
      * @return a handle for tracking, monitoring, or cancelling the task
+     * @throws IllegalStateException if the owning plugin is disabled (for example when called from its onDisable)
      */
     TaskHandle start();
 }

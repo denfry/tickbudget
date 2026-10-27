@@ -9,6 +9,7 @@ public record TickBudgetConfig(
         long safetyMarginNanos,
         long floorBudgetNanos,
         long defaultTaskBudgetNanos,
+        long maxTaskBudgetNanos,
         int lowPriorityWeight,
         int normalPriorityWeight,
         int highPriorityWeight,
@@ -21,6 +22,7 @@ public record TickBudgetConfig(
                 5_000_000L,   // 5 ms safety margin
                 500_000L,     // 0.5 ms floor guarantee per plugin
                 1_000_000L,   // 1 ms default per task
+                20_000_000L,  // 20 ms hard cap per task
                 1,            // LOW weight
                 2,            // NORMAL weight
                 4,            // HIGH weight
@@ -43,6 +45,7 @@ public record TickBudgetConfig(
                 safetyMarginNanos,
                 floorBudgetNanos,
                 defaultTaskBudgetNanos,
+                maxTaskBudgetNanos,
                 lowPriorityWeight,
                 normalPriorityWeight,
                 highPriorityWeight,
