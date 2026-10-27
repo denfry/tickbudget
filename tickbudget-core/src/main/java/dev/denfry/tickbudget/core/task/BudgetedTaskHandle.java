@@ -10,6 +10,7 @@ import dev.denfry.tickbudget.api.TaskState;
 import dev.denfry.tickbudget.core.SystemClock;
 import dev.denfry.tickbudget.core.accounting.PluginMetrics;
 import dev.denfry.tickbudget.core.bridge.PlatformBridge;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -244,9 +245,9 @@ public final class BudgetedTaskHandle implements TaskHandle {
         String suppressed = suppressedViolations > 0
                 ? " (" + suppressedViolations + " similar warnings suppressed)"
                 : "";
-        LOGGER.log(Level.WARNING,
-                "[TickBudget] Task ''{0}'' from plugin ''{1}'' violated budget: step took {2} ms (budget: {3} ms){4}",
-                new Object[]{name, ownerPlugin.getName(), stepDuration / 1_000_000.0, budget.nanosPerTick() / 1_000_000.0, suppressed});
+        LOGGER.warning(String.format(Locale.ROOT,
+                "Task '%s' from plugin '%s' violated budget: step took %.3f ms (budget: %.3f ms)%s",
+                name, ownerPlugin.getName(), stepDuration / 1_000_000.0, budget.nanosPerTick() / 1_000_000.0, suppressed));
         violationLogged = true;
         lastViolationLogNanos = now;
         suppressedViolations = 0;
@@ -261,7 +262,7 @@ public final class BudgetedTaskHandle implements TaskHandle {
                 }
             } catch (Throwable t) {
                 LOGGER.log(Level.SEVERE,
-                        "[TickBudget] Exception in onComplete callback for task ''" + name + "'' (" + ownerPlugin.getName() + ")", t);
+                        "Exception in onComplete callback for task '" + name + "' (" + ownerPlugin.getName() + ")", t);
             }
             future.complete(null);
         }
@@ -273,7 +274,7 @@ public final class BudgetedTaskHandle implements TaskHandle {
             // An onError handler owns the reporting; log only when nobody else will
             if (onError == null) {
                 LOGGER.log(Level.SEVERE,
-                        "[TickBudget] Task ''" + name + "'' from plugin ''" + ownerPlugin.getName() + "'' failed with exception:", cause);
+                        "Task '" + name + "' from plugin '" + ownerPlugin.getName() + "' failed with exception:", cause);
             }
             try {
                 if (onError != null) {
@@ -281,7 +282,7 @@ public final class BudgetedTaskHandle implements TaskHandle {
                 }
             } catch (Throwable t) {
                 LOGGER.log(Level.SEVERE,
-                        "[TickBudget] Exception in onError callback for task ''" + name + "'' (" + ownerPlugin.getName() + ")", t);
+                        "Exception in onError callback for task '" + name + "' (" + ownerPlugin.getName() + ")", t);
             }
             future.completeExceptionally(cause);
         }
