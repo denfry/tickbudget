@@ -51,6 +51,7 @@ public interface TaskBuilder {
 
     /**
      * Sets an error handler invoked if a step throws an uncaught exception.
+     * When a handler is set, TickBudget does not log the failure itself; without one it is logged as SEVERE.
      *
      * @param callback error handler receiving the exception
      * @return this builder

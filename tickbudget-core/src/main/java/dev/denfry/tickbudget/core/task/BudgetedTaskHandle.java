@@ -11,6 +11,7 @@ import dev.denfry.tickbudget.core.SystemClock;
 import dev.denfry.tickbudget.core.accounting.PluginMetrics;
 import dev.denfry.tickbudget.core.bridge.PlatformBridge;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
@@ -22,6 +23,8 @@ import org.bukkit.plugin.Plugin;
 public final class BudgetedTaskHandle implements TaskHandle {
 
     private static final Logger LOGGER = Logger.getLogger("TickBudget");
+    private static final long VIOLATION_LOG_INTERVAL_NANOS = 10_000_000_000L;
+    private static final AtomicLong SEQUENCE = new AtomicLong();
 
     private final String name;
     private final Plugin ownerPlugin;
@@ -38,13 +41,14 @@ public final class BudgetedTaskHandle implements TaskHandle {
     private final LongAdder steps = new LongAdder();
     private final LongAdder totalNanos = new LongAdder();
     private final AtomicLong lastStepDurationNanos = new AtomicLong(0L);
-
-    private static final long VIOLATION_LOG_INTERVAL_NANOS = 10_000_000_000L;
+    private final long sequence = SEQUENCE.incrementAndGet();
+    // Guards against overlapping slices, e.g. an async timer firing while the previous run is still going
+    private final AtomicBoolean running = new AtomicBoolean();
 
     private volatile PlatformBridge.TaskCancellable platformTaskHandle;
     private volatile Runnable terminationListener;
 
-    // Touched only by the thread executing the current slice
+    // Touched only by the thread holding `running`
     private boolean violationLogged;
     private long lastViolationLogNanos;
     private long suppressedViolations;
@@ -118,10 +122,17 @@ public final class BudgetedTaskHandle implements TaskHandle {
         return lastStepDurationNanos.get();
     }
 
+    public PluginMetrics metrics() {
+        return metrics;
+    }
+
     /**
-     * Attaches the platform scheduler task. If the task already terminated while it was being scheduled,
-     * the platform task is cancelled immediately so it cannot keep repeating.
+     * Submission order across all tasks; earlier tasks win ties in scheduling order.
      */
+    public long sequence() {
+        return sequence;
+    }
+
     public long lastRunTick() {
         return lastRunTick;
     }
@@ -130,6 +141,10 @@ public final class BudgetedTaskHandle implements TaskHandle {
         this.lastRunTick = tick;
     }
 
+    /**
+     * Attaches the platform scheduler task. If the task already terminated while it was being scheduled,
+     * the platform task is cancelled immediately so it cannot keep repeating.
+     */
     public void setPlatformTaskHandle(PlatformBridge.TaskCancellable handle) {
         this.platformTaskHandle = handle;
         if (handle != null && state.get().isTerminal()) {
@@ -160,45 +175,65 @@ public final class BudgetedTaskHandle implements TaskHandle {
     /**
      * Executes steps up to {@code allocatedNanos}.
      * Returns true if more steps remain for future ticks, false if the task is complete/terminated.
+     * A call made while another slice of this task is still running returns immediately without stepping.
      */
     public boolean executeSlice(long allocatedNanos, SystemClock clock) {
-        if (state.get() != TaskState.QUEUED) {
+        if (state.get() != TaskState.QUEUED || !running.compareAndSet(false, true)) {
+            return state.get() == TaskState.QUEUED;
+        }
+
+        long budgetNanos = budget.nanosPerTick();
+        long sliceSteps = 0L;
+        long sliceNanos = 0L;
+        long sliceViolations = 0L;
+        long stepDuration = 0L;
+        StepResult result = StepResult.MORE;
+        Throwable failure = null;
+        try {
+            // One clock read per step: each step's end is the next step's start
+            long now = clock.nanoTime();
+            long deadline = now + allocatedNanos;
+            while (now - deadline < 0 && state.get() == TaskState.QUEUED) {
+                long stepStart = now;
+                try {
+                    result = task.step();
+                } catch (Throwable t) {
+                    failure = t;
+                    break;
+                }
+                now = clock.nanoTime();
+                stepDuration = now - stepStart;
+                sliceSteps++;
+                sliceNanos += stepDuration;
+                if (stepDuration > budgetNanos) {
+                    sliceViolations++;
+                    reportViolation(stepDuration, now);
+                }
+                if (result == StepResult.DONE) {
+                    break;
+                }
+            }
+        } finally {
+            running.set(false);
+        }
+
+        // Metrics are flushed once per slice, before callbacks can observe them
+        if (sliceSteps > 0) {
+            steps.add(sliceSteps);
+            totalNanos.add(sliceNanos);
+            lastStepDurationNanos.set(stepDuration);
+            metrics.recordSlice(sliceSteps, sliceNanos, sliceViolations);
+        }
+
+        if (failure != null) {
+            fail(failure);
             return false;
         }
-
-        long deadline = clock.nanoTime() + allocatedNanos;
-
-        while (clock.nanoTime() - deadline < 0) {
-            if (state.get() != TaskState.QUEUED) {
-                return false;
-            }
-
-            StepResult result;
-            long stepStart = clock.nanoTime();
-            try {
-                result = task.step();
-            } catch (Throwable t) {
-                fail(t);
-                return false;
-            }
-            long stepDuration = clock.nanoTime() - stepStart;
-            lastStepDurationNanos.set(stepDuration);
-            steps.increment();
-            totalNanos.add(stepDuration);
-
-            boolean isViolation = stepDuration > budget.nanosPerTick();
-            metrics.recordStep(stepDuration, isViolation);
-            if (isViolation) {
-                reportViolation(stepDuration, stepStart + stepDuration);
-            }
-
-            if (result == StepResult.DONE) {
-                complete();
-                return false;
-            }
+        if (result == StepResult.DONE) {
+            complete();
+            return false;
         }
-
-        return true;
+        return state.get() == TaskState.QUEUED;
     }
 
     private void reportViolation(long stepDuration, long now) {
@@ -235,8 +270,11 @@ public final class BudgetedTaskHandle implements TaskHandle {
     public void fail(Throwable cause) {
         if (state.compareAndSet(TaskState.QUEUED, TaskState.FAILED)) {
             cleanUp();
-            LOGGER.log(Level.SEVERE,
-                    "[TickBudget] Task ''" + name + "'' from plugin ''" + ownerPlugin.getName() + "'' failed with exception:", cause);
+            // An onError handler owns the reporting; log only when nobody else will
+            if (onError == null) {
+                LOGGER.log(Level.SEVERE,
+                        "[TickBudget] Task ''" + name + "'' from plugin ''" + ownerPlugin.getName() + "'' failed with exception:", cause);
+            }
             try {
                 if (onError != null) {
                     onError.accept(cause);

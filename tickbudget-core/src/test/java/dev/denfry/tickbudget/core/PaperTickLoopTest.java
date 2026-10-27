@@ -20,7 +20,7 @@ public class PaperTickLoopTest {
     private final FakeClock clock = new FakeClock();
     private final TickBudgetConfig config = TickBudgetConfig.defaults();
     private final MetricsTracker metricsTracker = new MetricsTracker();
-    private final BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
+    private final BudgetRunner runner = new BudgetRunner(bridge, () -> config, clock);
     private final TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
 
     private void startCounting(TickBudget tb, AtomicInteger steps, long stepMillis, double budgetMillis, Priority priority) {

@@ -25,7 +25,7 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
         TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
@@ -59,7 +59,7 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
         TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
@@ -98,7 +98,7 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
         TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
@@ -132,7 +132,7 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
         TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
@@ -159,7 +159,7 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
         TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
@@ -182,7 +182,7 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
         TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
@@ -202,7 +202,7 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
         TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);

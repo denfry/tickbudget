@@ -24,7 +24,7 @@ public class TaskLifecycleTest {
     private final FakeClock clock = new FakeClock();
     private final AtomicReference<TickBudgetConfig> config = new AtomicReference<>(TickBudgetConfig.defaults());
     private final MetricsTracker metricsTracker = new MetricsTracker();
-    private final BudgetRunner runner = new BudgetRunner(bridge, config::get, metricsTracker, clock);
+    private final BudgetRunner runner = new BudgetRunner(bridge, config::get, clock);
     private final TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config::get);
     private final TickBudget tb = service.forPlugin(new MockPlugin("TestPlugin"));
 

@@ -1,7 +1,7 @@
 package dev.denfry.tickbudget.core.accounting;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
@@ -18,16 +18,14 @@ public final class PluginMetrics {
     private final LongAdder deferredTicks = new LongAdder();
     private final LongAdder violations = new LongAdder();
 
-    // Circular ring buffer of 60 one-second buckets
-    private final AtomicLong[] secondBuckets = new AtomicLong[BUCKET_COUNT];
-    private final AtomicLong[] bucketTimestamps = new AtomicLong[BUCKET_COUNT];
+    // Circular ring buffer of 60 one-second buckets. A bucket is replaced as a whole when its second
+    // rolls over, so concurrent writers from several region threads never lose each other's time.
+    private final AtomicReferenceArray<Bucket> secondBuckets = new AtomicReferenceArray<>(BUCKET_COUNT);
+
+    private record Bucket(long second, LongAdder nanos) {}
 
     public PluginMetrics(String pluginName) {
         this.pluginName = pluginName;
-        for (int i = 0; i < BUCKET_COUNT; i++) {
-            secondBuckets[i] = new AtomicLong(0L);
-            bucketTimestamps[i] = new AtomicLong(0L);
-        }
     }
 
     public String pluginName() {
@@ -46,25 +44,30 @@ public final class PluginMetrics {
         return activeTasks.get();
     }
 
-    public void recordStep(long durationNanos, boolean isViolation) {
-        totalSteps.increment();
-        totalNanos.add(durationNanos);
-        if (isViolation) {
-            violations.increment();
+    /**
+     * Records the outcome of one execution slice.
+     */
+    public void recordSlice(long steps, long nanos, long violationCount) {
+        totalSteps.add(steps);
+        totalNanos.add(nanos);
+        if (violationCount > 0) {
+            violations.add(violationCount);
         }
+        currentBucket().nanos().add(nanos);
+    }
 
+    private Bucket currentBucket() {
         long currentSec = System.currentTimeMillis() / 1000L;
         int idx = (int) (currentSec % BUCKET_COUNT);
-        long recordedSec = bucketTimestamps[idx].get();
-
-        if (recordedSec != currentSec) {
-            if (bucketTimestamps[idx].compareAndSet(recordedSec, currentSec)) {
-                secondBuckets[idx].set(durationNanos);
-            } else {
-                secondBuckets[idx].addAndGet(durationNanos);
+        while (true) {
+            Bucket bucket = secondBuckets.get(idx);
+            if (bucket != null && bucket.second() == currentSec) {
+                return bucket;
             }
-        } else {
-            secondBuckets[idx].addAndGet(durationNanos);
+            Bucket fresh = new Bucket(currentSec, new LongAdder());
+            if (secondBuckets.compareAndSet(idx, bucket, fresh)) {
+                return fresh;
+            }
         }
     }
 
@@ -95,9 +98,9 @@ public final class PluginMetrics {
         long currentSec = System.currentTimeMillis() / 1000L;
         long sum = 0L;
         for (int i = 0; i < BUCKET_COUNT; i++) {
-            long ts = bucketTimestamps[i].get();
-            if (currentSec - ts < BUCKET_COUNT) {
-                sum += secondBuckets[i].get();
+            Bucket bucket = secondBuckets.get(i);
+            if (bucket != null && currentSec - bucket.second() < BUCKET_COUNT) {
+                sum += bucket.nanos().sum();
             }
         }
         return sum;
