@@ -14,6 +14,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Full history and tags, for the version check and the changelog
+          fetch-depth: 0
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
@@ -28,6 +31,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Check that the tag matches the project version
+        run: |
+          VERSION=$(./gradlew -q :tickbudget-plugin:properties --property version | awk '/^version:/ {print $2}')
+          if [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match project version ${VERSION}"
+            exit 1
+          fi
+
       - name: Build release artifacts
         run: ./gradlew build :tickbudget-api:sourcesJar :tickbudget-api:javadocJar
 
@@ -40,3 +51,11 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
+
+      - name: Publish to Modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        run: |
+          PREVIOUS=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          export MODRINTH_CHANGELOG="$(git log --no-merges --pretty='- %s' "${PREVIOUS:+${PREVIOUS}..}${GITHUB_REF_NAME}")"
+          ./gradlew :tickbudget-plugin:modrinth :tickbudget-plugin:modrinthSyncBody

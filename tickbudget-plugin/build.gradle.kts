@@ -1,5 +1,6 @@
 plugins {
     id("com.gradleup.shadow")
+    id("com.modrinth.minotaur") version "2.10.0"
 }
 
 dependencies {
@@ -22,4 +23,20 @@ tasks.jar {
 
 tasks.build {
     dependsOn(tasks.shadowJar)
+}
+
+// Publishes the plugin jar to Modrinth. The token comes from the MODRINTH_TOKEN environment variable;
+// pass -PmodrinthDryRun=true to print the payload without uploading anything.
+modrinth {
+    projectId.set("tickbudget")
+    versionType.set("release")
+    uploadFile.set(tasks.shadowJar)
+    gameVersions.addAll(providers.gradleProperty("modrinthGameVersions").get().split(","))
+    loaders.addAll("paper", "folia", "purpur")
+    changelog.set(
+        providers.environmentVariable("MODRINTH_CHANGELOG")
+            .orElse("See https://github.com/denfry/tickbudget/releases")
+    )
+    syncBodyFrom.set(rootProject.file("docs/modrinth/description.md").readText())
+    debugMode.set(providers.gradleProperty("modrinthDryRun").map { it.toBoolean() }.orElse(false))
 }
