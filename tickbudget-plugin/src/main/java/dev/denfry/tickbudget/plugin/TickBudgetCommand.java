@@ -9,6 +9,7 @@ import dev.denfry.tickbudget.core.task.BudgetedTaskHandle;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -43,7 +44,7 @@ public final class TickBudgetCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        String sub = args.length > 0 ? args[0].toLowerCase() : "status";
+        String sub = args.length > 0 ? args[0].toLowerCase(Locale.ROOT) : "status";
 
         switch (sub) {
             case "status" -> handleStatus(sender);
@@ -126,8 +127,15 @@ public final class TickBudgetCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        String arg = args[1].toLowerCase();
-        boolean enable = arg.equals("on") || arg.equals("true") || arg.equals("1");
+        boolean enable;
+        switch (args[1].toLowerCase(Locale.ROOT)) {
+            case "on", "true", "1" -> enable = true;
+            case "off", "false", "0" -> enable = false;
+            default -> {
+                sender.sendMessage(Component.text("Usage: /tickbudget debug <on|off>", NamedTextColor.RED));
+                return;
+            }
+        }
         plugin.setDebugEnabled(enable);
 
         sender.sendMessage(Component.text("TickBudget debug mode has been ", NamedTextColor.GRAY)
@@ -147,11 +155,11 @@ public final class TickBudgetCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 1) {
             return List.of("status", "top", "debug", "reload").stream()
-                    .filter(s -> s.startsWith(args[0].toLowerCase()))
+                    .filter(s -> s.startsWith(args[0].toLowerCase(Locale.ROOT)))
                     .toList();
         } else if (args.length == 2 && args[0].equalsIgnoreCase("debug")) {
             return List.of("on", "off").stream()
-                    .filter(s -> s.startsWith(args[1].toLowerCase()))
+                    .filter(s -> s.startsWith(args[1].toLowerCase(Locale.ROOT)))
                     .toList();
         }
 
