@@ -69,7 +69,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("dev.denfry.tickbudget:tickbudget-api:0.1.0-SNAPSHOT")
+    compileOnly("dev.denfry.tickbudget:tickbudget-api:0.2.0")
 }
 ```
 
@@ -78,7 +78,7 @@ dependencies {
 <dependency>
     <groupId>dev.denfry.tickbudget</groupId>
     <artifactId>tickbudget-api</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.2.0</version>
     <scope>provided</scope>
 </dependency>
 ```
