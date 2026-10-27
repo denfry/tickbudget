@@ -22,7 +22,7 @@ public final class TaskBuilderImpl implements TaskBuilder {
     private final PluginMetrics metrics;
     private final Function<BudgetedTaskHandle, TaskHandle> taskSubmitter;
 
-    private Budget budget = Budget.millisPerTick(1.0);
+    private Budget budget;
     private Priority priority = Priority.NORMAL;
     private String name;
     private Runnable onComplete;
@@ -32,12 +32,14 @@ public final class TaskBuilderImpl implements TaskBuilder {
             Plugin ownerPlugin,
             Target target,
             BudgetedTask task,
+            long defaultBudgetNanos,
             PluginMetrics metrics,
             Function<BudgetedTaskHandle, TaskHandle> taskSubmitter
     ) {
         this.ownerPlugin = ownerPlugin;
         this.target = target;
         this.task = task;
+        this.budget = new Budget(Math.max(1L, defaultBudgetNanos));
         this.metrics = metrics;
         this.taskSubmitter = taskSubmitter;
         this.name = ownerPlugin.getName() + "-task-" + TASK_COUNTER.getAndIncrement();

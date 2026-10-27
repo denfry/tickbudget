@@ -60,7 +60,10 @@ public final class FoliaPlatformBridge implements PlatformBridge {
         } else if (target instanceof Target.OfRegion r) {
             Bukkit.getRegionScheduler().execute(plugin, r.world(), r.chunkX(), r.chunkZ(), wrapped);
         } else if (target instanceof Target.OfEntity e) {
-            e.entity().getScheduler().execute(plugin, wrapped, null, 0L);
+            Runnable retired = () -> future.cancel(false);
+            if (!e.entity().getScheduler().execute(plugin, wrapped, retired, 0L)) {
+                retired.run();
+            }
         } else {
             wrapped.run();
         }
@@ -69,7 +72,7 @@ public final class FoliaPlatformBridge implements PlatformBridge {
     }
 
     @Override
-    public TaskCancellable scheduleRepeating(Plugin plugin, Target target, Runnable action, long periodTicks) {
+    public TaskCancellable scheduleRepeating(Plugin plugin, Target target, Runnable action, Runnable onRetired, long periodTicks) {
         ScheduledTask task;
         if (target instanceof Target.OfAsync) {
             long millis = Math.max(1L, periodTicks * 50L);
@@ -79,7 +82,12 @@ public final class FoliaPlatformBridge implements PlatformBridge {
         } else if (target instanceof Target.OfRegion r) {
             task = Bukkit.getRegionScheduler().runAtFixedRate(plugin, r.world(), r.chunkX(), r.chunkZ(), t -> action.run(), 1L, periodTicks);
         } else if (target instanceof Target.OfEntity e) {
-            task = e.entity().getScheduler().runAtFixedRate(plugin, t -> action.run(), null, 1L, periodTicks);
+            task = e.entity().getScheduler().runAtFixedRate(plugin, t -> action.run(), onRetired, 1L, periodTicks);
+            if (task == null) {
+                // Entity was already removed; the scheduler does not invoke onRetired in this case
+                onRetired.run();
+                return () -> {};
+            }
         } else {
             task = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, t -> action.run(), 1L, periodTicks);
         }

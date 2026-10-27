@@ -33,14 +33,17 @@ public interface PlatformBridge {
 
     /**
      * Executes {@code action} once on {@code target}'s owning thread/scheduler.
+     * The future is cancelled if the target is removed before the action runs.
      */
     CompletableFuture<Void> schedule(Plugin plugin, Target target, Runnable action);
 
     /**
      * Schedules a repeating tick action on {@code target}.
+     * {@code onRetired} runs instead of further executions once the target no longer exists
+     * (for example a removed entity on Folia), including when it is already gone at scheduling time.
      * Returns a handle to cancel the repeating task.
      */
-    TaskCancellable scheduleRepeating(Plugin plugin, Target target, Runnable action, long periodTicks);
+    TaskCancellable scheduleRepeating(Plugin plugin, Target target, Runnable action, Runnable onRetired, long periodTicks);
 
     CompletableFuture<Chunk> loadChunkAsync(World world, int chunkX, int chunkZ);
 

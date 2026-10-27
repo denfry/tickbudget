@@ -18,7 +18,7 @@ public class FairShareDispatcherTest {
 
     private final TickBudgetConfig config = TickBudgetConfig.defaults();
     private final FakeClock clock = new FakeClock();
-    private final FairShareDispatcher dispatcher = new FairShareDispatcher(config, clock);
+    private final FairShareDispatcher dispatcher = new FairShareDispatcher(() -> config, clock);
 
     private BudgetedTaskHandle createTask(String name, MockPlugin plugin, Priority priority, double budgetMillis) {
         return new BudgetedTaskHandle(

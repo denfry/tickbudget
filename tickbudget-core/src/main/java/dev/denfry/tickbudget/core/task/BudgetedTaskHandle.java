@@ -39,7 +39,15 @@ public final class BudgetedTaskHandle implements TaskHandle {
     private final LongAdder totalNanos = new LongAdder();
     private final AtomicLong lastStepDurationNanos = new AtomicLong(0L);
 
+    private static final long VIOLATION_LOG_INTERVAL_NANOS = 10_000_000_000L;
+
     private volatile PlatformBridge.TaskCancellable platformTaskHandle;
+    private volatile Runnable terminationListener;
+
+    // Touched only by the thread executing the current slice
+    private boolean violationLogged;
+    private long lastViolationLogNanos;
+    private long suppressedViolations;
 
     public BudgetedTaskHandle(
             String name,
@@ -107,8 +115,22 @@ public final class BudgetedTaskHandle implements TaskHandle {
         return lastStepDurationNanos.get();
     }
 
+    /**
+     * Attaches the platform scheduler task. If the task already terminated while it was being scheduled,
+     * the platform task is cancelled immediately so it cannot keep repeating.
+     */
     public void setPlatformTaskHandle(PlatformBridge.TaskCancellable handle) {
         this.platformTaskHandle = handle;
+        if (handle != null && state.get().isTerminal()) {
+            handle.cancel();
+        }
+    }
+
+    /**
+     * Sets a listener invoked once when the task reaches a terminal state, before callbacks and the future.
+     */
+    public void setTerminationListener(Runnable listener) {
+        this.terminationListener = listener;
     }
 
     @Override
@@ -156,9 +178,7 @@ public final class BudgetedTaskHandle implements TaskHandle {
             boolean isViolation = stepDuration > budget.nanosPerTick();
             metrics.recordStep(stepDuration, isViolation);
             if (isViolation) {
-                LOGGER.log(Level.WARNING,
-                        "[TickBudget] Task ''{0}'' from plugin ''{1}'' violated budget: step took {2} ms (budget: {3} ms)",
-                        new Object[]{name, ownerPlugin.getName(), stepDuration / 1_000_000.0, budget.nanosPerTick() / 1_000_000.0});
+                reportViolation(stepDuration, stepStart + stepDuration);
             }
 
             if (result == StepResult.DONE) {
@@ -168,6 +188,22 @@ public final class BudgetedTaskHandle implements TaskHandle {
         }
 
         return true;
+    }
+
+    private void reportViolation(long stepDuration, long now) {
+        if (violationLogged && now - lastViolationLogNanos < VIOLATION_LOG_INTERVAL_NANOS) {
+            suppressedViolations++;
+            return;
+        }
+        String suppressed = suppressedViolations > 0
+                ? " (" + suppressedViolations + " similar warnings suppressed)"
+                : "";
+        LOGGER.log(Level.WARNING,
+                "[TickBudget] Task ''{0}'' from plugin ''{1}'' violated budget: step took {2} ms (budget: {3} ms){4}",
+                new Object[]{name, ownerPlugin.getName(), stepDuration / 1_000_000.0, budget.nanosPerTick() / 1_000_000.0, suppressed});
+        violationLogged = true;
+        lastViolationLogNanos = now;
+        suppressedViolations = 0;
     }
 
     private void complete() {
@@ -207,6 +243,10 @@ public final class BudgetedTaskHandle implements TaskHandle {
         PlatformBridge.TaskCancellable h = this.platformTaskHandle;
         if (h != null) {
             h.cancel();
+        }
+        Runnable listener = this.terminationListener;
+        if (listener != null) {
+            listener.run();
         }
     }
 }

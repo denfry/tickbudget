@@ -79,7 +79,8 @@ public final class PaperPlatformBridge implements PlatformBridge, Listener {
     }
 
     @Override
-    public TaskCancellable scheduleRepeating(Plugin plugin, Target target, Runnable action, long periodTicks) {
+    public TaskCancellable scheduleRepeating(Plugin plugin, Target target, Runnable action, Runnable onRetired, long periodTicks) {
+        // Paper targets never retire: entity and region targets resolve to the main thread
         BukkitTask task;
         if (target instanceof Target.OfAsync) {
             task = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, action, 0L, periodTicks);

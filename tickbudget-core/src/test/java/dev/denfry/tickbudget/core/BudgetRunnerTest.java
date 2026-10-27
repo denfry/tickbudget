@@ -25,10 +25,10 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
-        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config);
+        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
         var tb = service.forPlugin(plugin);
 
         AtomicInteger steps = new AtomicInteger();
@@ -59,10 +59,10 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
-        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config);
+        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
         var tb = service.forPlugin(plugin);
 
         AtomicInteger steps = new AtomicInteger();
@@ -98,10 +98,10 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
-        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config);
+        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
         var tb = service.forPlugin(plugin);
 
         AtomicInteger steps = new AtomicInteger();
@@ -132,10 +132,10 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
-        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config);
+        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
         var tb = service.forPlugin(plugin);
 
         AtomicBoolean errorReported = new AtomicBoolean(false);
@@ -159,10 +159,10 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
-        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config);
+        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
         var tb = service.forPlugin(plugin);
 
         TaskHandle handle = tb.run(Target.global(), () -> StepResult.MORE)
@@ -182,10 +182,10 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
-        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config);
+        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
         var tb = service.forPlugin(plugin);
 
         bridge.setOwned(true);
@@ -202,10 +202,10 @@ public class BudgetRunnerTest {
         FakeClock clock = new FakeClock();
         TickBudgetConfig config = TickBudgetConfig.defaults();
         MetricsTracker metricsTracker = new MetricsTracker();
-        BudgetRunner runner = new BudgetRunner(bridge, config, metricsTracker, clock);
+        BudgetRunner runner = new BudgetRunner(bridge, () -> config, metricsTracker, clock);
 
         MockPlugin plugin = new MockPlugin("TestPlugin");
-        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config);
+        TickBudgetServiceImpl service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, () -> config);
         var tb = service.forPlugin(plugin);
 
         AtomicInteger steps = new AtomicInteger();

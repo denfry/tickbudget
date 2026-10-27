@@ -8,6 +8,7 @@ import dev.denfry.tickbudget.core.config.TickBudgetConfig;
 import dev.denfry.tickbudget.core.runner.BudgetRunner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Supplier;
 import org.bukkit.plugin.Plugin;
 
 public final class TickBudgetServiceImpl implements TickBudgetService {
@@ -15,7 +16,7 @@ public final class TickBudgetServiceImpl implements TickBudgetService {
     private final PlatformBridge bridge;
     private final BudgetRunner runner;
     private final MetricsTracker metricsTracker;
-    private final TickBudgetConfig config;
+    private final Supplier<TickBudgetConfig> config;
 
     private final ConcurrentMap<Plugin, TickBudget> instances = new ConcurrentHashMap<>();
 
@@ -23,7 +24,7 @@ public final class TickBudgetServiceImpl implements TickBudgetService {
             PlatformBridge bridge,
             BudgetRunner runner,
             MetricsTracker metricsTracker,
-            TickBudgetConfig config
+            Supplier<TickBudgetConfig> config
     ) {
         this.bridge = bridge;
         this.runner = runner;

@@ -10,6 +10,7 @@ import dev.denfry.tickbudget.core.runner.BudgetRunner;
 import dev.denfry.tickbudget.folia.FoliaPlatformBridge;
 import dev.denfry.tickbudget.paper.PaperPlatformBridge;
 import io.papermc.paper.ServerBuildInfo;
+import java.util.concurrent.atomic.AtomicReference;
 import net.kyori.adventure.key.Key;
 import org.bstats.bukkit.Metrics;
 import org.bstats.charts.SimplePie;
@@ -28,20 +29,21 @@ public final class TickBudgetPlugin extends JavaPlugin implements Listener {
     private MetricsTracker metricsTracker;
     private BudgetRunner runner;
     private TickBudgetServiceImpl service;
-    private TickBudgetConfig config;
+    // Shared with the runner and service so reload/debug changes apply without a restart
+    private final AtomicReference<TickBudgetConfig> config = new AtomicReference<>();
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        this.config = loadConfig();
+        config.set(loadConfig());
 
         this.bridge = detectBridge();
         this.bridge.init(this);
         getLogger().info("Initializing TickBudget with platform bridge: " + bridge.name());
 
         this.metricsTracker = new MetricsTracker();
-        this.runner = new BudgetRunner(bridge, config, metricsTracker, SystemClock.DEFAULT);
-        this.service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config);
+        this.runner = new BudgetRunner(bridge, config::get, metricsTracker, SystemClock.DEFAULT);
+        this.service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config::get);
 
         // Register the public TickBudgetService in Bukkit services manager
         Bukkit.getServicesManager().register(
@@ -73,7 +75,7 @@ public final class TickBudgetPlugin extends JavaPlugin implements Listener {
                 bMetrics.addCustomChart(new SimplePie("platform", () -> bridge.name()));
                 bMetrics.addCustomChart(new SingleLineChart("active_client_plugins", () -> metricsTracker.allMetrics().size()));
                 bMetrics.addCustomChart(new SingleLineChart("active_tasks", () -> runner.activeTasks().size()));
-                bMetrics.addCustomChart(new SimplePie("debug_mode", () -> config.debugEnabled() ? "Enabled" : "Disabled"));
+                bMetrics.addCustomChart(new SimplePie("debug_mode", () -> config.get().debugEnabled() ? "Enabled" : "Disabled"));
             } catch (Throwable t) {
                 getLogger().fine("Could not initialize bStats metrics: " + t.getMessage());
             }
@@ -142,17 +144,17 @@ public final class TickBudgetPlugin extends JavaPlugin implements Listener {
     }
 
     public TickBudgetConfig config() {
-        return config;
+        return config.get();
     }
 
     public void setDebugEnabled(boolean debug) {
-        this.config = config.withDebug(debug);
+        config.updateAndGet(current -> current.withDebug(debug));
         getConfig().set("debug", debug);
         saveConfig();
     }
 
     public void reload() {
         reloadConfig();
-        this.config = loadConfig();
+        config.set(loadConfig());
     }
 }
