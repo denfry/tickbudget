@@ -14,6 +14,7 @@ public interface TickBudgetService {
      *
      * @param plugin the owning plugin
      * @return the plugin-scoped TickBudget instance
+     * @throws IllegalArgumentException if {@code plugin} is not an enabled plugin registered with the server
      */
     TickBudget forPlugin(Plugin plugin);
 }

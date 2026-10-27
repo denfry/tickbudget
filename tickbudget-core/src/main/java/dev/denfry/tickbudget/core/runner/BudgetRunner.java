@@ -77,6 +77,11 @@ public final class BudgetRunner {
     }
 
     public TaskHandle submit(BudgetedTaskHandle handle) {
+        if (!handle.ownerPlugin().isEnabled()) {
+            handle.cancel();
+            throw new IllegalStateException(
+                    "Cannot start task '" + handle.name() + "': plugin '" + handle.ownerPlugin().getName() + "' is disabled");
+        }
         allActiveTasks.add(handle);
         // Runs on every terminal transition (done, failed, cancelled, target retired)
         handle.setTerminationListener(() -> {

@@ -2,6 +2,7 @@ package dev.denfry.tickbudget.core.bridge;
 
 import dev.denfry.tickbudget.api.Target;
 import java.util.concurrent.CompletableFuture;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -27,6 +28,13 @@ public interface PlatformBridge {
      */
     default long lastTickDurationNanos() {
         return -1L;
+    }
+
+    /**
+     * Returns true if {@code plugin} is the instance the server's plugin manager holds under its name.
+     */
+    default boolean isRegisteredPlugin(Plugin plugin) {
+        return Bukkit.getPluginManager().getPlugin(plugin.getName()) == plugin;
     }
 
     boolean isOwnedByCurrentThread(Target target);

@@ -11,6 +11,7 @@ import dev.denfry.tickbudget.core.config.TickBudgetConfig;
 import dev.denfry.tickbudget.core.runner.BudgetRunner;
 import dev.denfry.tickbudget.core.task.TaskBuilderImpl;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -30,6 +31,7 @@ public final class TickBudgetImpl implements TickBudget {
     private final MetricsTracker metricsTracker;
     private final Supplier<TickBudgetConfig> config;
     private final AsyncChunks asyncChunks;
+    private final AtomicBoolean budgetClampWarned = new AtomicBoolean();
 
     public TickBudgetImpl(
             Plugin plugin,
@@ -54,14 +56,26 @@ public final class TickBudgetImpl implements TickBudget {
         if (task == null) {
             throw new IllegalArgumentException("task cannot be null");
         }
+        TickBudgetConfig cfg = config.get();
         return new TaskBuilderImpl(
                 plugin,
                 target,
                 task,
-                config.get().defaultTaskBudgetNanos(),
+                cfg.defaultTaskBudgetNanos(),
+                cfg.maxTaskBudgetNanos(),
+                requestedNanos -> warnBudgetClamped(requestedNanos, cfg.maxTaskBudgetNanos()),
                 metricsTracker.getOrCreate(plugin.getName()),
                 runner::submit
         );
+    }
+
+    private void warnBudgetClamped(long requestedNanos, long maxNanos) {
+        if (budgetClampWarned.compareAndSet(false, true)) {
+            LOGGER.log(Level.WARNING,
+                    "[TickBudget] Plugin ''{0}'' requested a task budget of {1} ms; clamped to max-task-budget-ms ({2} ms). "
+                            + "Further clamps for this plugin are not logged.",
+                    new Object[]{plugin.getName(), requestedNanos / 1_000_000.0, maxNanos / 1_000_000.0});
+        }
     }
 
     @Override

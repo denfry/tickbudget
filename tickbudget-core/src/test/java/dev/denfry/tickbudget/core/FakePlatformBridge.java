@@ -17,6 +17,7 @@ public class FakePlatformBridge implements PlatformBridge {
     private boolean owned = true;
     private long lastTickDurationNanos = -1L;
     private boolean runRepeatingOnSchedule = false;
+    private boolean pluginsRegistered = true;
     private final List<Repeating> repeating = new ArrayList<>();
 
     /** A repeating task registered through {@link #scheduleRepeating}. */
@@ -38,6 +39,15 @@ public class FakePlatformBridge implements PlatformBridge {
 
     public List<Repeating> repeating() {
         return repeating;
+    }
+
+    public void setPluginsRegistered(boolean pluginsRegistered) {
+        this.pluginsRegistered = pluginsRegistered;
+    }
+
+    @Override
+    public boolean isRegisteredPlugin(Plugin plugin) {
+        return pluginsRegistered;
     }
 
     public void setFolia(boolean folia) {

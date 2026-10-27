@@ -20,6 +20,7 @@ public interface TickBudget {
      * @param plugin the plugin acquiring the service
      * @return the TickBudget instance
      * @throws IllegalStateException if the TickBudget plugin is not installed or enabled
+     * @throws IllegalArgumentException if {@code plugin} is not an enabled plugin registered with the server
      */
     static TickBudget of(Plugin plugin) {
         RegisteredServiceProvider<TickBudgetService> registration =

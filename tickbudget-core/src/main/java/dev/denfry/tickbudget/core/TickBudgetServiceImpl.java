@@ -37,6 +37,11 @@ public final class TickBudgetServiceImpl implements TickBudgetService {
         if (plugin == null) {
             throw new IllegalArgumentException("plugin cannot be null");
         }
+        // Shares are granted per plugin, so only real, enabled plugins may hold an instance
+        if (!plugin.isEnabled() || !bridge.isRegisteredPlugin(plugin)) {
+            throw new IllegalArgumentException(
+                    "Plugin '" + plugin.getName() + "' is not an enabled plugin registered with the server");
+        }
         return instances.computeIfAbsent(plugin, p ->
                 new TickBudgetImpl(p, bridge, runner, metricsTracker, config));
     }

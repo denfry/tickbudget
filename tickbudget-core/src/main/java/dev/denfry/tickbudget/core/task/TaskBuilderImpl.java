@@ -10,6 +10,7 @@ import dev.denfry.tickbudget.core.accounting.PluginMetrics;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.LongConsumer;
 import org.bukkit.plugin.Plugin;
 
 public final class TaskBuilderImpl implements TaskBuilder {
@@ -19,6 +20,8 @@ public final class TaskBuilderImpl implements TaskBuilder {
     private final Plugin ownerPlugin;
     private final Target target;
     private final BudgetedTask task;
+    private final long maxBudgetNanos;
+    private final LongConsumer onBudgetClamped;
     private final PluginMetrics metrics;
     private final Function<BudgetedTaskHandle, TaskHandle> taskSubmitter;
 
@@ -33,13 +36,17 @@ public final class TaskBuilderImpl implements TaskBuilder {
             Target target,
             BudgetedTask task,
             long defaultBudgetNanos,
+            long maxBudgetNanos,
+            LongConsumer onBudgetClamped,
             PluginMetrics metrics,
             Function<BudgetedTaskHandle, TaskHandle> taskSubmitter
     ) {
         this.ownerPlugin = ownerPlugin;
         this.target = target;
         this.task = task;
-        this.budget = new Budget(Math.max(1L, defaultBudgetNanos));
+        this.maxBudgetNanos = Math.max(1L, maxBudgetNanos);
+        this.onBudgetClamped = onBudgetClamped;
+        this.budget = new Budget(Math.max(1L, Math.min(defaultBudgetNanos, this.maxBudgetNanos)));
         this.metrics = metrics;
         this.taskSubmitter = taskSubmitter;
         this.name = ownerPlugin.getName() + "-task-" + TASK_COUNTER.getAndIncrement();
@@ -86,12 +93,17 @@ public final class TaskBuilderImpl implements TaskBuilder {
 
     @Override
     public TaskHandle start() {
+        Budget effectiveBudget = budget;
+        if (budget.nanosPerTick() > maxBudgetNanos) {
+            onBudgetClamped.accept(budget.nanosPerTick());
+            effectiveBudget = new Budget(maxBudgetNanos);
+        }
         BudgetedTaskHandle handle = new BudgetedTaskHandle(
                 name,
                 ownerPlugin,
                 target,
                 task,
-                budget,
+                effectiveBudget,
                 priority,
                 onComplete,
                 onError,

@@ -39,6 +39,9 @@ floor-budget-ms: 0.5
 # Budget for tasks that do not set their own (ms)
 default-task-budget-ms: 1.0
 
+# Largest budget any task may use per tick, CRITICAL included (ms)
+max-task-budget-ms: 20.0
+
 # Share of the free time by task priority
 priority-weights:
   low: 1
