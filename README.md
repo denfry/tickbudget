@@ -28,7 +28,7 @@ In Minecraft server development, heavy operations (block iteration, entity scans
 
 **TickBudget** solves this by providing:
 * ⏱️ **Predictable Tick Budgeting:** Slice long-running workloads across consecutive ticks with strict millisecond budgets.
-* ⚖️ **Adaptive Fair-Share Pool:** Dynamic pooling based on real-time server tick consumption (`ServerTickStartEvent`), ensuring guaranteed execution time (`floor`) and weighted priority distribution (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`).
+* ⚖️ **Adaptive Fair-Share Pool:** Dynamic pooling based on the server's own work in the previous tick (`ServerTickEndEvent`), ensuring guaranteed execution time (`floor`), weighted max-min sharing between plugins (`LOW`, `NORMAL`, `HIGH`, `CRITICAL`), and round-robin between a plugin's own tasks.
 * 🌐 **Zero-Headache Multi-Platform Support:** Single `Target` abstraction (`global()`, `region(loc)`, `entity(entity)`, `async()`) that routes tasks to the correct scheduler on Paper and Folia automatically.
 * 🔍 **Thread Ownership Verification (`assertOn`):** Detects illegal cross-region or off-thread access before it corrupts world state.
 * 🚀 **Safe Async Helpers:** Unified, reliable asynchronous chunk loading and teleportation across platforms.
@@ -42,7 +42,7 @@ In Minecraft server development, heavy operations (block iteration, entity scans
 tickbudget/
 ├── tickbudget-api        # Thin public API (compileOnly for consumer plugins)
 ├── tickbudget-core       # Budget runner, fair-share dispatcher, metrics (independent of server APIs)
-├── tickbudget-paper      # Paper bridge: single-thread dispatch, ServerTickStartEvent tracking
+├── tickbudget-paper      # Paper bridge: single-thread dispatch, ServerTickEndEvent tick timing
 ├── tickbudget-folia      # Folia bridge: regionized threading & scheduler bridges
 ├── tickbudget-plugin     # Server plugin: Bukkit service, admin commands, bStats, config.yml
 └── tickbudget-testplugin # Live integration test suite for automated CI & server tests

@@ -49,6 +49,9 @@ public final class BudgetedTaskHandle implements TaskHandle {
     private long lastViolationLogNanos;
     private long suppressedViolations;
 
+    // Paper main-thread tick loop only: tick number of the last slice, used for round-robin ordering
+    private long lastRunTick;
+
     public BudgetedTaskHandle(
             String name,
             Plugin ownerPlugin,
@@ -119,6 +122,14 @@ public final class BudgetedTaskHandle implements TaskHandle {
      * Attaches the platform scheduler task. If the task already terminated while it was being scheduled,
      * the platform task is cancelled immediately so it cannot keep repeating.
      */
+    public long lastRunTick() {
+        return lastRunTick;
+    }
+
+    public void markRun(long tick) {
+        this.lastRunTick = tick;
+    }
+
     public void setPlatformTaskHandle(PlatformBridge.TaskCancellable handle) {
         this.platformTaskHandle = handle;
         if (handle != null && state.get().isTerminal()) {

@@ -1,19 +1,22 @@
 package dev.denfry.tickbudget.core.runner;
 
-import dev.denfry.tickbudget.api.Priority;
 import dev.denfry.tickbudget.core.SystemClock;
 import dev.denfry.tickbudget.core.config.TickBudgetConfig;
 import dev.denfry.tickbudget.core.task.BudgetedTaskHandle;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.bukkit.plugin.Plugin;
 
 /**
- * Calculates fair-share budget slices for active tasks in a single domain tick.
+ * Splits the tick time pool between plugins for a single domain tick.
+ * <p>
+ * Every plugin with ready tasks is guaranteed the floor budget (capped at its demand). The rest of the pool is
+ * distributed by priority weight using max-min fairness: a plugin never receives more than its demand
+ * (the sum of its tasks' budgets), and whatever it cannot use is redistributed to the others.
  */
 public final class FairShareDispatcher {
 
@@ -25,87 +28,99 @@ public final class FairShareDispatcher {
         this.clock = clock;
     }
 
-    public record TaskAllocation(BudgetedTaskHandle handle, long allocatedNanos) {}
+    /**
+     * Time granted to one plugin for this tick.
+     *
+     * @param plugin the owning plugin
+     * @param tasks the plugin's ready tasks in execution order: highest priority first, then least recently run
+     * @param shareNanos nanoseconds the plugin's non-critical tasks may spend this tick
+     */
+    public record PluginAllocation(Plugin plugin, List<BudgetedTaskHandle> tasks, long shareNanos) {}
 
     /**
-     * Calculates time allocations for ready tasks given the available tick budget pool.
+     * Calculates per-plugin shares for ready tasks given the available tick budget pool.
+     * Plugins are returned in the order their first task appears in {@code readyTasks}.
      */
-    public List<TaskAllocation> allocate(List<BudgetedTaskHandle> readyTasks, long availablePoolNanos) {
+    public List<PluginAllocation> allocate(List<BudgetedTaskHandle> readyTasks, long availablePoolNanos) {
         if (readyTasks.isEmpty()) {
             return List.of();
         }
         TickBudgetConfig config = configSupplier.get();
 
-        // Group tasks by plugin, keeping the highest priority / oldest task first
-        Map<Plugin, List<BudgetedTaskHandle>> tasksByPlugin = new HashMap<>();
+        Map<Plugin, List<BudgetedTaskHandle>> tasksByPlugin = new LinkedHashMap<>();
         for (BudgetedTaskHandle task : readyTasks) {
             tasksByPlugin.computeIfAbsent(task.ownerPlugin(), k -> new ArrayList<>()).add(task);
         }
 
-        // Sort tasks within each plugin by Priority (CRITICAL -> HIGH -> NORMAL -> LOW)
-        for (List<BudgetedTaskHandle> list : tasksByPlugin.values()) {
-            list.sort(Comparator.comparingInt((BudgetedTaskHandle t) -> config.weightFor(t.priority())).reversed());
+        Comparator<BudgetedTaskHandle> executionOrder = Comparator
+                .comparingInt((BudgetedTaskHandle t) -> config.weightFor(t.priority())).reversed()
+                .thenComparingLong(BudgetedTaskHandle::lastRunTick);
+
+        int pluginCount = tasksByPlugin.size();
+        List<Plugin> plugins = new ArrayList<>(tasksByPlugin.keySet());
+        long[] demand = new long[pluginCount];
+        long[] share = new long[pluginCount];
+        int[] weight = new int[pluginCount];
+
+        // 1. Guaranteed floor for every plugin, even when the tick is overloaded
+        long remainingPool = Math.max(0L, availablePoolNanos);
+        for (int i = 0; i < pluginCount; i++) {
+            List<BudgetedTaskHandle> tasks = tasksByPlugin.get(plugins.get(i));
+            tasks.sort(executionOrder);
+            long pluginDemand = 0L;
+            for (BudgetedTaskHandle task : tasks) {
+                pluginDemand = saturatedAdd(pluginDemand, task.budget().nanosPerTick());
+            }
+            demand[i] = pluginDemand;
+            weight[i] = Math.max(0, config.weightFor(tasks.getFirst().priority()));
+            share[i] = Math.min(config.floorBudgetNanos(), pluginDemand);
+            remainingPool -= share[i];
         }
+        remainingPool = Math.max(0L, remainingPool);
 
-        List<TaskAllocation> allocations = new ArrayList<>();
-        int activePluginCount = tasksByPlugin.size();
-
-        if (availablePoolNanos <= 0) {
-            // Overloaded tick: only CRITICAL tasks and guaranteed floor
-            for (Map.Entry<Plugin, List<BudgetedTaskHandle>> entry : tasksByPlugin.entrySet()) {
-                BudgetedTaskHandle task = entry.getValue().getFirst();
-                if (task.priority() == Priority.CRITICAL) {
-                    allocations.add(new TaskAllocation(task, task.budget().nanosPerTick()));
-                } else {
-                    allocations.add(new TaskAllocation(task, Math.min(config.floorBudgetNanos(), task.budget().nanosPerTick())));
+        // 2. Weighted water-filling of the surplus until it is spent or every demand is met
+        while (remainingPool > 0) {
+            long totalWeight = 0L;
+            for (int i = 0; i < pluginCount; i++) {
+                if (share[i] < demand[i]) {
+                    totalWeight += weight[i];
                 }
             }
-            return allocations;
-        }
-
-        // 1. Reserve floor for each plugin
-        long totalFloorRequired = (long) activePluginCount * config.floorBudgetNanos();
-        long remainingPool;
-        long floorPerPlugin;
-
-        if (availablePoolNanos >= totalFloorRequired) {
-            floorPerPlugin = config.floorBudgetNanos();
-            remainingPool = availablePoolNanos - totalFloorRequired;
-        } else {
-            floorPerPlugin = availablePoolNanos / activePluginCount;
-            remainingPool = 0;
-        }
-
-        // 2. Calculate priority weights for the top task of each plugin
-        int totalWeight = 0;
-        for (List<BudgetedTaskHandle> list : tasksByPlugin.values()) {
-            BudgetedTaskHandle topTask = list.getFirst();
-            totalWeight += config.weightFor(topTask.priority());
-        }
-
-        // 3. Allocate to each plugin's primary task
-        for (Map.Entry<Plugin, List<BudgetedTaskHandle>> entry : tasksByPlugin.entrySet()) {
-            BudgetedTaskHandle topTask = entry.getValue().getFirst();
-            long baseFloor = floorPerPlugin;
-            long weightShare = 0;
-            if (remainingPool > 0 && totalWeight > 0) {
-                int w = config.weightFor(topTask.priority());
-                weightShare = (remainingPool * w) / totalWeight;
+            if (totalWeight == 0L) {
+                break;
             }
 
-            long totalForPlugin = baseFloor + weightShare;
-
-            if (topTask.priority() == Priority.CRITICAL) {
-                totalForPlugin = Math.max(totalForPlugin, topTask.budget().nanosPerTick());
+            long distributed = 0L;
+            boolean anySaturated = false;
+            for (int i = 0; i < pluginCount; i++) {
+                if (share[i] >= demand[i] || weight[i] == 0) {
+                    continue;
+                }
+                long offer = remainingPool * weight[i] / totalWeight;
+                long granted = Math.min(offer, demand[i] - share[i]);
+                share[i] += granted;
+                distributed += granted;
+                if (share[i] >= demand[i]) {
+                    anySaturated = true;
+                }
             }
-
-            // Cap allocation at the task's configured budget
-            long taskBudget = topTask.budget().nanosPerTick();
-            long finalAllocation = Math.min(totalForPlugin, taskBudget);
-
-            allocations.add(new TaskAllocation(topTask, finalAllocation));
+            remainingPool -= distributed;
+            // Without a newly satisfied plugin every offer was taken in full, so only rounding dust is left
+            if (!anySaturated || distributed == 0L) {
+                break;
+            }
         }
 
+        List<PluginAllocation> allocations = new ArrayList<>(pluginCount);
+        for (int i = 0; i < pluginCount; i++) {
+            Plugin plugin = plugins.get(i);
+            allocations.add(new PluginAllocation(plugin, List.copyOf(tasksByPlugin.get(plugin)), share[i]));
+        }
         return allocations;
+    }
+
+    private static long saturatedAdd(long a, long b) {
+        long sum = a + b;
+        return ((a ^ sum) & (b ^ sum)) < 0 ? Long.MAX_VALUE : sum;
     }
 }

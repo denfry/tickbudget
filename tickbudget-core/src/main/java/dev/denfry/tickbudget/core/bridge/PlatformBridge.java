@@ -22,10 +22,10 @@ public interface PlatformBridge {
     }
 
     /**
-     * Returns nanoseconds elapsed so far in the current server tick,
-     * or -1 if the platform does not provide tick-start tracking.
+     * Returns the wall-clock duration of the last completed server tick in nanoseconds,
+     * or -1 if the platform does not provide tick timing.
      */
-    default long currentTickElapsedNanos() {
+    default long lastTickDurationNanos() {
         return -1L;
     }
 

@@ -1,5 +1,6 @@
 package dev.denfry.tickbudget.core.runner;
 
+import dev.denfry.tickbudget.api.Priority;
 import dev.denfry.tickbudget.api.Target;
 import dev.denfry.tickbudget.api.TaskHandle;
 import dev.denfry.tickbudget.core.SystemClock;
@@ -8,7 +9,9 @@ import dev.denfry.tickbudget.core.bridge.PlatformBridge;
 import dev.denfry.tickbudget.core.config.TickBudgetConfig;
 import dev.denfry.tickbudget.core.task.BudgetedTaskHandle;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
 import org.bukkit.plugin.Plugin;
@@ -17,6 +20,8 @@ import org.bukkit.plugin.Plugin;
  * Manages the queue and execution loop for budgeted tasks across platforms.
  */
 public final class BudgetRunner {
+
+    private static final long TICK_NANOS = 50_000_000L;
 
     private final PlatformBridge bridge;
     private final Supplier<TickBudgetConfig> config;
@@ -28,6 +33,10 @@ public final class BudgetRunner {
     private final List<BudgetedTaskHandle> paperSyncQueue = new CopyOnWriteArrayList<>();
 
     private volatile PlatformBridge.TaskCancellable paperTickLoopHandle;
+
+    // Paper main-thread tick loop state
+    private long tickCounter;
+    private long lastLoopNanos;
 
     public BudgetRunner(
             PlatformBridge bridge,
@@ -105,42 +114,64 @@ public final class BudgetRunner {
 
     /**
      * Executes one tick of the Paper main thread domain with fair-share scheduling.
+     * <p>
+     * The pool is the tick window left after the server's own work in the previous tick (its duration minus the
+     * time this loop spent in it) and the safety margin. Plugins run in an order that rotates every tick; time
+     * actually used, including overshoot, is charged both to the plugin's share and to the tick total, so one
+     * slow step cannot push the tick past what was planned. CRITICAL tasks always get their own budget.
      */
     public void processPaperMainTick() {
         if (paperSyncQueue.isEmpty()) {
+            lastLoopNanos = 0L;
             return;
         }
+        long loopStart = clock.nanoTime();
+        tickCounter++;
 
-        // 50ms default tick window minus already-elapsed time in this tick, minus safety margin
-        long totalTickNanos = 50_000_000L;
-        long elapsedNanos = bridge.currentTickElapsedNanos();
         TickBudgetConfig cfg = config.get();
-        long poolNanos;
-        if (elapsedNanos >= 0) {
-            long remainingTickNanos = Math.max(0, totalTickNanos - elapsedNanos);
-            poolNanos = Math.max(0, remainingTickNanos - cfg.safetyMarginNanos());
-        } else {
-            // Fallback when tick-start tracking is unavailable
-            poolNanos = Math.max(0, totalTickNanos - cfg.safetyMarginNanos());
-        }
+        long lastTickNanos = bridge.lastTickDurationNanos();
+        long serverWorkNanos = lastTickNanos >= 0 ? Math.max(0L, lastTickNanos - lastLoopNanos) : 0L;
+        long poolNanos = Math.max(0L, TICK_NANOS - serverWorkNanos - cfg.safetyMarginNanos());
 
         List<BudgetedTaskHandle> currentQueue = new ArrayList<>(paperSyncQueue);
-        List<FairShareDispatcher.TaskAllocation> allocations = dispatcher.allocate(currentQueue, poolNanos);
+        List<FairShareDispatcher.PluginAllocation> allocations = dispatcher.allocate(currentQueue, poolNanos);
 
-        List<BudgetedTaskHandle> scheduledTasks = new ArrayList<>();
-        for (FairShareDispatcher.TaskAllocation allocation : allocations) {
-            BudgetedTaskHandle task = allocation.handle();
-            scheduledTasks.add(task);
+        long plannedNanos = 0L;
+        for (FairShareDispatcher.PluginAllocation allocation : allocations) {
+            plannedNanos += allocation.shareNanos();
+        }
 
-            task.executeSlice(allocation.allocatedNanos(), clock);
+        Set<BudgetedTaskHandle> ranThisTick = new HashSet<>();
+        long spentNanos = 0L;
+        int pluginCount = allocations.size();
+        int offset = (int) (tickCounter % pluginCount);
+        for (int i = 0; i < pluginCount; i++) {
+            FairShareDispatcher.PluginAllocation allocation = allocations.get((offset + i) % pluginCount);
+            long pluginRemaining = allocation.shareNanos();
+            for (BudgetedTaskHandle task : allocation.tasks()) {
+                long slice = task.priority() == Priority.CRITICAL
+                        ? task.budget().nanosPerTick()
+                        : Math.min(task.budget().nanosPerTick(), Math.min(pluginRemaining, plannedNanos - spentNanos));
+                if (slice <= 0L) {
+                    continue;
+                }
+                long sliceStart = clock.nanoTime();
+                task.markRun(tickCounter);
+                task.executeSlice(slice, clock);
+                long used = clock.nanoTime() - sliceStart;
+                pluginRemaining -= used;
+                spentNanos += used;
+                ranThisTick.add(task);
+            }
         }
 
         // Record deferred ticks for tasks that had to wait
         for (BudgetedTaskHandle task : currentQueue) {
-            if (!scheduledTasks.contains(task)) {
+            if (!ranThisTick.contains(task)) {
                 metricsTracker.getOrCreate(task.ownerPlugin().getName()).recordDeferredTick();
             }
         }
+        lastLoopNanos = clock.nanoTime() - loopStart;
     }
 
     public void cancelTasksForPlugin(Plugin plugin) {

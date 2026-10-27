@@ -15,7 +15,7 @@ public class FakePlatformBridge implements PlatformBridge {
 
     private boolean folia = false;
     private boolean owned = true;
-    private long tickElapsedNanos = -1L;
+    private long lastTickDurationNanos = -1L;
     private boolean runRepeatingOnSchedule = false;
     private final List<Repeating> repeating = new ArrayList<>();
 
@@ -48,13 +48,13 @@ public class FakePlatformBridge implements PlatformBridge {
         this.owned = owned;
     }
 
-    public void setTickElapsedNanos(long tickElapsedNanos) {
-        this.tickElapsedNanos = tickElapsedNanos;
+    public void setLastTickDurationNanos(long lastTickDurationNanos) {
+        this.lastTickDurationNanos = lastTickDurationNanos;
     }
 
     @Override
-    public long currentTickElapsedNanos() {
-        return tickElapsedNanos;
+    public long lastTickDurationNanos() {
+        return lastTickDurationNanos;
     }
 
     @Override
