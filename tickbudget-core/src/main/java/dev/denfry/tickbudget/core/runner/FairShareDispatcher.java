@@ -32,7 +32,8 @@ public final class FairShareDispatcher {
      * Time granted to one plugin for this tick.
      *
      * @param plugin the owning plugin
-     * @param tasks the plugin's ready tasks in execution order: highest priority first, then least recently run
+     * @param tasks the plugin's ready tasks in execution order: highest priority first, then least recently run,
+     *              then oldest
      * @param shareNanos nanoseconds the plugin's non-critical tasks may spend this tick
      */
     public record PluginAllocation(Plugin plugin, List<BudgetedTaskHandle> tasks, long shareNanos) {}
@@ -54,7 +55,8 @@ public final class FairShareDispatcher {
 
         Comparator<BudgetedTaskHandle> executionOrder = Comparator
                 .comparingInt((BudgetedTaskHandle t) -> config.weightFor(t.priority())).reversed()
-                .thenComparingLong(BudgetedTaskHandle::lastRunTick);
+                .thenComparingLong(BudgetedTaskHandle::lastRunTick)
+                .thenComparingLong(BudgetedTaskHandle::sequence);
 
         int pluginCount = tasksByPlugin.size();
         List<Plugin> plugins = new ArrayList<>(tasksByPlugin.keySet());

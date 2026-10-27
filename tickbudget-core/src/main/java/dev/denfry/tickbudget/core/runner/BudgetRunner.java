@@ -4,15 +4,15 @@ import dev.denfry.tickbudget.api.Priority;
 import dev.denfry.tickbudget.api.Target;
 import dev.denfry.tickbudget.api.TaskHandle;
 import dev.denfry.tickbudget.core.SystemClock;
-import dev.denfry.tickbudget.core.accounting.MetricsTracker;
 import dev.denfry.tickbudget.core.bridge.PlatformBridge;
 import dev.denfry.tickbudget.core.config.TickBudgetConfig;
 import dev.denfry.tickbudget.core.task.BudgetedTaskHandle;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import org.bukkit.plugin.Plugin;
 
@@ -25,12 +25,12 @@ public final class BudgetRunner {
 
     private final PlatformBridge bridge;
     private final Supplier<TickBudgetConfig> config;
-    private final MetricsTracker metricsTracker;
     private final FairShareDispatcher dispatcher;
     private final SystemClock clock;
 
-    private final List<BudgetedTaskHandle> allActiveTasks = new CopyOnWriteArrayList<>();
-    private final List<BudgetedTaskHandle> paperSyncQueue = new CopyOnWriteArrayList<>();
+    // Hash sets: tasks are added and removed constantly, so copy-on-write lists would cost O(n) per change
+    private final Set<BudgetedTaskHandle> allActiveTasks = ConcurrentHashMap.newKeySet();
+    private final Set<BudgetedTaskHandle> paperSyncQueue = ConcurrentHashMap.newKeySet();
 
     private volatile PlatformBridge.TaskCancellable paperTickLoopHandle;
 
@@ -41,12 +41,10 @@ public final class BudgetRunner {
     public BudgetRunner(
             PlatformBridge bridge,
             Supplier<TickBudgetConfig> config,
-            MetricsTracker metricsTracker,
             SystemClock clock
     ) {
         this.bridge = bridge;
         this.config = config;
-        this.metricsTracker = metricsTracker;
         this.clock = clock;
         this.dispatcher = new FairShareDispatcher(config, clock);
     }
@@ -139,6 +137,7 @@ public final class BudgetRunner {
         long poolNanos = Math.max(0L, TICK_NANOS - serverWorkNanos - cfg.safetyMarginNanos());
 
         List<BudgetedTaskHandle> currentQueue = new ArrayList<>(paperSyncQueue);
+        currentQueue.sort(Comparator.comparingLong(BudgetedTaskHandle::sequence));
         List<FairShareDispatcher.PluginAllocation> allocations = dispatcher.allocate(currentQueue, poolNanos);
 
         long plannedNanos = 0L;
@@ -173,7 +172,7 @@ public final class BudgetRunner {
         // Record deferred ticks for tasks that had to wait
         for (BudgetedTaskHandle task : currentQueue) {
             if (!ranThisTick.contains(task)) {
-                metricsTracker.getOrCreate(task.ownerPlugin().getName()).recordDeferredTick();
+                task.metrics().recordDeferredTick();
             }
         }
         lastLoopNanos = clock.nanoTime() - loopStart;

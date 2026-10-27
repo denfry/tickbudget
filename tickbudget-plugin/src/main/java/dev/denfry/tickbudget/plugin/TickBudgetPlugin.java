@@ -42,7 +42,7 @@ public final class TickBudgetPlugin extends JavaPlugin implements Listener {
         getLogger().info("Initializing TickBudget with platform bridge: " + bridge.name());
 
         this.metricsTracker = new MetricsTracker();
-        this.runner = new BudgetRunner(bridge, config::get, metricsTracker, SystemClock.DEFAULT);
+        this.runner = new BudgetRunner(bridge, config::get, SystemClock.DEFAULT);
         this.service = new TickBudgetServiceImpl(bridge, runner, metricsTracker, config::get);
 
         // Register the public TickBudgetService in Bukkit services manager
@@ -142,7 +142,7 @@ public final class TickBudgetPlugin extends JavaPlugin implements Listener {
                 highWeight,
                 criticalWeight,
                 debug
-        );
+        ).validated(message -> getLogger().warning("config.yml: " + message));
     }
 
     public TickBudgetConfig config() {

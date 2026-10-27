@@ -7,18 +7,22 @@ import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
-/** Collects WARNING records written to the TickBudget logger while an action runs. */
+/** Collects records written to the TickBudget logger while an action runs. */
 final class LogCapture {
 
     private LogCapture() {
     }
 
     static List<LogRecord> warnings(Runnable action) {
+        return records(Level.WARNING, action);
+    }
+
+    static List<LogRecord> records(Level level, Runnable action) {
         List<LogRecord> records = new CopyOnWriteArrayList<>();
         Handler handler = new Handler() {
             @Override
             public void publish(LogRecord record) {
-                if (record.getLevel() == Level.WARNING) {
+                if (record.getLevel() == level) {
                     records.add(record);
                 }
             }
