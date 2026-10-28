@@ -70,12 +70,12 @@ public final class TickBudgetCommand implements CommandExecutor, TabCompleter {
         if (metricsList.isEmpty()) {
             sender.sendMessage(Component.text("No registered plugins currently using TickBudget.", NamedTextColor.GRAY));
         } else {
-            sender.sendMessage(Component.text("Plugin Metrics (last 60s):", NamedTextColor.AQUA));
+            sender.sendMessage(Component.text("Plugin Metrics (CPU: last 60s, steps/deferred/violations: since startup):", NamedTextColor.AQUA));
             for (PluginMetrics pm : metricsList) {
                 Component line = Component.text(" • ", NamedTextColor.DARK_GRAY)
                         .append(Component.text(pm.pluginName(), NamedTextColor.WHITE, TextDecoration.BOLD))
                         .append(Component.text(": ", NamedTextColor.GRAY))
-                        .append(Component.text(String.format("%.2f ms", pm.millisLastMinute()), NamedTextColor.GOLD))
+                        .append(Component.text(String.format(Locale.ROOT, "%.2f ms", pm.millisLastMinute()), NamedTextColor.GOLD))
                         .append(Component.text(" | Tasks: ", NamedTextColor.GRAY))
                         .append(Component.text(pm.activeTasks(), NamedTextColor.GREEN))
                         .append(Component.text(" | Steps: ", NamedTextColor.GRAY))
@@ -107,7 +107,7 @@ public final class TickBudgetCommand implements CommandExecutor, TabCompleter {
                         .append(Component.text(t.name(), NamedTextColor.WHITE, TextDecoration.BOLD))
                         .append(Component.text(" (" + t.ownerPlugin().getName() + ")", NamedTextColor.GRAY))
                         .append(Component.text(" - ", NamedTextColor.DARK_GRAY))
-                        .append(Component.text(String.format("%.2f ms total", t.totalMillis()), NamedTextColor.GOLD))
+                        .append(Component.text(String.format(Locale.ROOT, "%.2f ms total", t.totalMillis()), NamedTextColor.GOLD))
                         .append(Component.text(" | Steps: ", NamedTextColor.GRAY))
                         .append(Component.text(t.steps(), NamedTextColor.YELLOW))
                         .append(Component.text(" | Priority: ", NamedTextColor.GRAY))
