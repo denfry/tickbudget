@@ -81,7 +81,7 @@ Add the API through [JitPack](https://jitpack.io/#denfry/tickbudget) and do not 
 
 ```kotlin
 repositories { maven("https://jitpack.io") }
-dependencies { compileOnly("com.github.denfry.tickbudget:tickbudget-api:v0.3.0") }
+dependencies { compileOnly("com.github.denfry:tickbudget:v0.3.0") }
 ```
 
 Then add `depend: [TickBudget]` to your `plugin.yml`, or `softdepend: [TickBudget]` with a fallback timer if your plugin should also run without it. The [README](https://github.com/denfry/tickbudget#5-optional-dependency-softdepend-with-a-fallback) has a ready-made fallback class. The API jar is also attached to every [GitHub release](https://github.com/denfry/tickbudget/releases).

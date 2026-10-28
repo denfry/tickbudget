@@ -75,14 +75,14 @@ softdepend: [TickBudget]
 ```
 
 ### 2. Gradle (Kotlin DSL)
-The API is published through [JitPack](https://jitpack.io/#denfry/tickbudget); it is not on Maven Central.
+The API is published through [JitPack](https://jitpack.io/#denfry/tickbudget) (only the API module is published there, so the artifact is simply `tickbudget`); it is not on Maven Central.
 ```kotlin
 repositories {
     maven("https://jitpack.io")
 }
 
 dependencies {
-    compileOnly("com.github.denfry.tickbudget:tickbudget-api:v0.3.0")
+    compileOnly("com.github.denfry:tickbudget:v0.3.0")
 }
 ```
 
@@ -96,8 +96,8 @@ dependencies {
 </repositories>
 
 <dependency>
-    <groupId>com.github.denfry.tickbudget</groupId>
-    <artifactId>tickbudget-api</artifactId>
+    <groupId>com.github.denfry</groupId>
+    <artifactId>tickbudget</artifactId>
     <version>v0.3.0</version>
     <scope>provided</scope>
 </dependency>
