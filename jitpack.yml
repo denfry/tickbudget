@@ -1,0 +1,7 @@
+# JitPack builds the public API on demand:
+#   repositories { maven("https://jitpack.io") }
+#   compileOnly("com.github.denfry.tickbudget:tickbudget-api:v<version>")
+jdk:
+  - openjdk21
+install:
+  - ./gradlew :tickbudget-api:publishToMavenLocal -x test
