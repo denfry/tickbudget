@@ -210,7 +210,8 @@ public final class BudgetedTaskHandle implements TaskHandle {
                     sliceViolations++;
                     reportViolation(stepDuration, now);
                 }
-                if (result == StepResult.DONE) {
+                // DONE finishes the task, YIELD only ends this tick's slice
+                if (result != StepResult.MORE) {
                     break;
                 }
             }

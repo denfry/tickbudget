@@ -4,6 +4,7 @@ import dev.denfry.tickbudget.api.Budget;
 import dev.denfry.tickbudget.api.Priority;
 import dev.denfry.tickbudget.api.StepResult;
 import dev.denfry.tickbudget.api.Target;
+import dev.denfry.tickbudget.api.TaskHandle;
 import dev.denfry.tickbudget.api.TickBudget;
 import dev.denfry.tickbudget.core.accounting.MetricsTracker;
 import dev.denfry.tickbudget.core.config.TickBudgetConfig;
@@ -112,5 +113,31 @@ public class PaperTickLoopTest {
 
         assertEquals(5, critical.get());
         assertTrue(normal.get() <= 1, "NORMAL gets at most its floor-sized slice");
+    }
+
+    @Test
+    @DisplayName("YIELD ends the task's slice for this tick but keeps it queued")
+    void testYieldEndsSliceKeepsTask() {
+        AtomicInteger steps = new AtomicInteger();
+        AtomicInteger pending = new AtomicInteger(3);
+        TaskHandle handle = service.forPlugin(new MockPlugin("A")).run(Target.global(), () -> {
+            steps.incrementAndGet();
+            clock.advanceMillis(1);
+            if (pending.get() == 0) {
+                return StepResult.YIELD;
+            }
+            return pending.decrementAndGet() == 0 ? StepResult.YIELD : StepResult.MORE;
+        }).budgetMillis(10.0).start();
+
+        runner.processPaperMainTick();
+        assertEquals(3, steps.get(), "Three units of work, the last one yields");
+        assertFalse(handle.isDone());
+
+        // Nothing to do: one cheap step per tick instead of spinning the whole budget
+        runner.processPaperMainTick();
+        runner.processPaperMainTick();
+        assertEquals(5, steps.get());
+        assertFalse(handle.isDone());
+        assertEquals(0, metricsTracker.get("A").deferredTicks(), "A yielding task still ran this tick");
     }
 }
