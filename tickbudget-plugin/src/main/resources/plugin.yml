@@ -1,5 +1,5 @@
 name: TickBudget
-version: '0.2.0'
+version: '0.3.0'
 main: dev.denfry.tickbudget.plugin.TickBudgetPlugin
 api-version: '1.21'
 folia-supported: true
