@@ -50,38 +50,62 @@ tickbudget/
 
 ---
 
+## 🖥️ For Server Owners
+
+TickBudget is a library plugin: on its own it changes nothing, it only paces plugins that use its API.
+
+1. Download `TickBudget-<version>.jar` from [Modrinth](https://modrinth.com/plugin/tickbudget) or [GitHub Releases](https://github.com/denfry/tickbudget/releases).
+2. Put it into `plugins/` and restart. No setup is needed, the defaults suit most servers.
+3. Run `/tickbudget status` to see how much tick time each plugin that uses TickBudget spends.
+
+Install it when a plugin you run lists TickBudget as a dependency or recommends it.
+
+---
+
 ## 📦 For Developers: Getting Started
 
-### 1. Add `plugin.yml` Dependency
+### 1. `plugin.yml`
+Use `depend` if your plugin cannot work without TickBudget:
 ```yaml
-name: YourPlugin
-version: 1.0.0
-main: com.example.YourPlugin
 depend: [TickBudget]
+```
+or `softdepend` together with a fallback (see [Optional dependency](#5-optional-dependency-softdepend-with-a-fallback)) if it should also run on servers without it:
+```yaml
+softdepend: [TickBudget]
 ```
 
 ### 2. Gradle (Kotlin DSL)
+The API is published through [JitPack](https://jitpack.io/#denfry/tickbudget); it is not on Maven Central.
 ```kotlin
 repositories {
-    mavenCentral()
-    // Or local Maven if developing locally
-    mavenLocal()
+    maven("https://jitpack.io")
 }
 
 dependencies {
-    compileOnly("dev.denfry.tickbudget:tickbudget-api:0.2.0")
+    compileOnly("com.github.denfry.tickbudget:tickbudget-api:v0.3.0")
 }
 ```
 
 ### 3. Maven
 ```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
 <dependency>
-    <groupId>dev.denfry.tickbudget</groupId>
+    <groupId>com.github.denfry.tickbudget</groupId>
     <artifactId>tickbudget-api</artifactId>
-    <version>0.2.0</version>
+    <version>v0.3.0</version>
     <scope>provided</scope>
 </dependency>
 ```
+
+Without a repository: every [GitHub release](https://github.com/denfry/tickbudget/releases) has `tickbudget-api-<version>.jar` attached, use it as `compileOnly(files("libs/tickbudget-api-0.3.0.jar"))`.
+
+Do not shade the API into your plugin: the classes come from the TickBudget plugin at runtime.
 
 ---
 
@@ -123,7 +147,81 @@ tb.run(Target.entity(player), () -> {
 .start();
 ```
 
-### 3. Thread Safety Diagnostics (`assertOn`)
+### 3. Step Results
+A step returns one of:
+
+| Result | Meaning |
+|---|---|
+| `MORE` | More work remains; another step may run in this tick if the budget allows. |
+| `YIELD` | Nothing more to do in this tick, but the task is not finished; it continues on a later tick. *(since 0.3.0)* |
+| `DONE` | The task is finished; `onComplete` runs. |
+
+### 4. Long-Lived Queue Workers (`YIELD`)
+A worker that drains a queue which is sometimes empty should yield instead of returning `MORE`, otherwise an idle
+worker spins through its whole budget every tick:
+
+```java
+Queue<Chunk> pending = new ArrayDeque<>();
+
+tb.run(Target.global(), () -> {
+    Chunk chunk = pending.poll();
+    if (chunk == null) {
+        return StepResult.YIELD; // idle: one cheap step per tick
+    }
+    fixChunk(chunk);
+    return StepResult.MORE;
+})
+.name("chunk-fixer")
+.budgetMillis(3.0)
+.priority(Priority.LOW)
+.start();
+```
+
+### 5. Optional Dependency (`softdepend`) with a Fallback
+Keep every TickBudget call in a nested class that is loaded only when the plugin is present, and fall back to a
+plain timer with a fixed per-tick budget otherwise:
+
+```java
+public final class Pacer {
+
+    /** Runs {@code step} until it returns false. */
+    public static void run(Plugin plugin, String name, double millisPerTick, BooleanSupplier step) {
+        if (plugin.getServer().getPluginManager().isPluginEnabled("TickBudget")) {
+            WithTickBudget.run(plugin, name, millisPerTick, step);
+            return;
+        }
+        long budgetNanos = (long) (millisPerTick * 1_000_000);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                long deadline = System.nanoTime() + budgetNanos;
+                do {
+                    if (!step.getAsBoolean()) {
+                        cancel();
+                        return;
+                    }
+                } while (System.nanoTime() < deadline);
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
+    }
+
+    // Not loaded unless TickBudget is enabled, so its classes are never resolved without it
+    private static final class WithTickBudget {
+        static void run(Plugin plugin, String name, double millisPerTick, BooleanSupplier step) {
+            TickBudget.of(plugin)
+                    .run(Target.global(), () -> step.getAsBoolean() ? StepResult.MORE : StepResult.DONE)
+                    .name(name)
+                    .budgetMillis(millisPerTick)
+                    .start();
+        }
+    }
+}
+```
+
+Keep steps short (well under the budget, ideally fractions of a millisecond): the budget is checked between steps,
+so a long step overshoots and is reported as a violation.
+
+### 6. Thread Safety Diagnostics (`assertOn`)
 Protect against illegal threading before it reaches production:
 
 ```java
@@ -131,7 +229,7 @@ Protect against illegal threading before it reaches production:
 tb.assertOn(Target.entity(targetPlayer));
 ```
 
-### 4. Async Chunk Loading & Teleportation
+### 7. Async Chunk Loading & Teleportation
 Uniform, crash-safe async utilities for both Paper and Folia:
 
 ```java
@@ -186,7 +284,7 @@ Permission required: `tickbudget.admin` (granted to OP by default).
 
 | Command | Description |
 |---|---|
-| `/tickbudget status` | Displays platform bridge, active task count, and last 60s per-plugin stats (CPU ms, completed steps, deferred ticks, violations). |
+| `/tickbudget status` | Displays platform bridge, active task count and per-plugin stats: CPU ms over the last 60 s, plus completed steps, deferred ticks and violations since startup. |
 | `/tickbudget top` | Lists top active tasks sorted by cumulative CPU time consumed. |
 | `/tickbudget debug <on\|off>` | Toggles detailed thread ownership violation diagnostics. |
 | `/tickbudget reload` | Reloads `config.yml` settings without restarting the server. |
@@ -195,7 +293,7 @@ Permission required: `tickbudget.admin` (granted to OP by default).
 ```
 ---------------- [ TickBudget Status ] ----------------
 Platform: Paper | Active Tasks: 1
-Plugin Metrics (last 60s):
+Plugin Metrics (CPU: last 60s, steps/deferred/violations: since startup):
  • MyMiningPlugin: 14.82 ms | Tasks: 1 | Steps: 420 | Deferred: 0 | Violations: 0
  • CustomSpawns: 3.10 ms | Tasks: 0 | Steps: 15 | Deferred: 0 | Violations: 0
 -------------------------------------------------------
@@ -229,7 +327,7 @@ cd tickbudget
 ```
 
 Compiled plugin JAR is generated at:
-`tickbudget-plugin/build/libs/TickBudget-0.1.0-SNAPSHOT.jar`
+`tickbudget-plugin/build/libs/TickBudget-<version>.jar`
 
 Publish API to local Maven repository:
 ```bash

@@ -8,7 +8,7 @@ TickBudget is a library plugin. It does nothing on its own until another plugin 
 
 If a plugin you run lists TickBudget as a dependency, drop the jar into `plugins/` and restart. There is nothing to set up. The defaults work for most servers.
 
-* **Per-plugin tick usage** - `/tickbudget status` shows CPU time, completed steps, deferred ticks and thread violations for each plugin over the last 60 seconds.
+* **Per-plugin tick usage** - `/tickbudget status` shows each plugin's CPU time over the last 60 seconds, plus completed steps, deferred ticks and thread violations since startup.
 * **Top tasks** - `/tickbudget top` lists running tasks by total CPU time.
 * **Fair sharing** - each plugin gets a guaranteed minimum per tick. The rest of the free time is split by task priority, so one plugin cannot use up the whole tick.
 * **Paper and Folia** - the plugin detects the platform at startup and uses the matching scheduler.
@@ -19,7 +19,7 @@ Requires Java 21. Tested on Paper 1.21 to 26.3 and on every Folia build from 1.2
 
 Everything uses the permission `tickbudget.admin`, which operators have by default.
 
-**/tickbudget status** *Platform, active task count and per-plugin usage for the last 60 seconds*
+**/tickbudget status** *Platform, active task count and per-plugin usage*
 </br>
 **/tickbudget top** *Running tasks sorted by CPU time*
 </br>
@@ -71,11 +71,20 @@ tb.run(Target.region(location), BudgetedTask.iterate(blocks, block -> block.setT
         .start();
 ```
 
+A step returns `MORE` (keep going if the budget allows), `YIELD` (nothing more this tick, continue later) or `DONE`. Long-lived workers that drain a sometimes-empty queue should return `YIELD` when idle, so they cost one cheap step per tick instead of their whole budget.
+
 * **Targets** - `Target.global()`, `Target.region(location)`, `Target.entity(entity)` and `Target.async()`. On Folia each one maps to the matching scheduler. On Paper, global, region and entity run on the main thread and async runs off it.
 * **Thread checks** - `tb.assertOn(target)` throws if the current thread does not own the target.
 * **Async chunks** - `tb.chunks().loadAsync(world, x, z)` loads a chunk without blocking.
 
-Add `depend: [TickBudget]` to your `plugin.yml`. The API jar is attached to every [GitHub release](https://github.com/denfry/tickbudget/releases). To build it yourself, run `./gradlew :tickbudget-api:publishToMavenLocal`.
+Add the API through [JitPack](https://jitpack.io/#denfry/tickbudget) and do not shade it:
+
+```kotlin
+repositories { maven("https://jitpack.io") }
+dependencies { compileOnly("com.github.denfry.tickbudget:tickbudget-api:v0.3.0") }
+```
+
+Then add `depend: [TickBudget]` to your `plugin.yml`, or `softdepend: [TickBudget]` with a fallback timer if your plugin should also run without it. The [README](https://github.com/denfry/tickbudget#5-optional-dependency-softdepend-with-a-fallback) has a ready-made fallback class. The API jar is also attached to every [GitHub release](https://github.com/denfry/tickbudget/releases).
 
 ### Metrics
 
